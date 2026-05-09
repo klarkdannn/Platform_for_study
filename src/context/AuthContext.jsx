@@ -39,9 +39,14 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(uid) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
-    setProfile(data)
-    setLoading(false)
+    try {
+      const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
+      setProfile(data ?? null)
+    } catch (e) {
+      setProfile(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function signUp(email, password, fullName) {

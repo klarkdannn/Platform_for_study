@@ -52,13 +52,33 @@
                 </executions>
             </plugin>
 
-            <!-- 2. Запустить Java-сервер -->
+            <!-- 2. Упаковать в JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.platform.Server</mainClass>
+                        </manifest>
+                    </archive>
+                    <finalName>platform</finalName>
+                </configuration>
+            </plugin>
+
+            <!-- 3. Запустить в ОТДЕЛЬНОМ JVM (exec:exec форкает процесс) -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
                 <configuration>
-                    <mainClass>com.platform.Server</mainClass>
+                    <!-- exec:exec форкает отдельный JVM — не мешает Maven и javac-подпроцессам -->
+                    <executable>java</executable>
+                    <arguments>
+                        <argument>-jar</argument>
+                        <argument>${project.build.directory}/platform.jar</argument>
+                    </arguments>
                     <workingDirectory>${project.basedir}</workingDirectory>
                 </configuration>
             </plugin>

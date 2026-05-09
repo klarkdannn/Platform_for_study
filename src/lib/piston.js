@@ -14,7 +14,7 @@ export async function runJava(code) {
       })
     })
   } catch (e) {
-    throw new Error('Сервер недоступен. Убедись что сервер запущен: mvn compile exec:java')
+    throw new Error('Сервер недоступен. Убедись что сервер запущен: mvn package exec:exec')
   }
 
   if (!res.ok) throw new Error(`Ошибка сервера: ${res.status}`)

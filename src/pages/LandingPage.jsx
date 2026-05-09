@@ -5,7 +5,7 @@ const features = [
   { icon: Code2,      title: 'Редактор кода',     desc: 'Monaco Editor (как VS Code) прямо в браузере' },
   { icon: Zap,        title: 'Мгновенная проверка', desc: 'Запусти Java-код и получи результат за секунды' },
   { icon: BookOpen,   title: '25+ лекций',          desc: 'Базовый синтаксис, ООП, коллекции, Spring Boot, SQL' },
-  { icon: CheckCircle,'title': 'Задания',            desc: 'Практические упражнения с автоматической проверкой' },
+  { icon: CheckCircle, title: 'Задания',             desc: 'Практические упражнения с автоматической проверкой' },
   { icon: Users,      title: 'Роли',                desc: 'Студент и преподаватель с дашбордом' },
   { icon: Database,   title: 'Базы данных',         desc: 'Урок по SQL, PostgreSQL и JPA' },
 ]

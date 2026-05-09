@@ -29,11 +29,11 @@
     {
       "label": "☕ Maven: запустить сервер (порт 3000)",
       "type": "shell",
-      "command": "mvn compile exec:java",
+      "command": "mvn package exec:exec",
       "group": "build",
       "presentation": { "reveal": "always", "panel": "new", "group": "maven" },
       "problemMatcher": [],
-      "detail": "Скачивает Node.js, собирает React, запускает Java-сервер"
+      "detail": "Скачивает Node.js, собирает React, пакует JAR, запускает отдельный JVM"
     },
     {
       "label": "☕ Maven: только собрать React (без запуска)",
