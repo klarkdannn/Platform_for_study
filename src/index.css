@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  body {
+    @apply bg-surface-900 text-slate-100;
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #1e1e1e; }
+  ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #555; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm;
+  }
+  .btn-secondary {
+    @apply bg-surface-600 hover:bg-surface-500 text-slate-200 px-4 py-2 rounded-lg font-medium transition-colors text-sm;
+  }
+  .badge-easy   { @apply bg-green-900/40 text-green-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-medium { @apply bg-yellow-900/40 text-yellow-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-hard   { @apply bg-red-900/40 text-red-400 text-xs px-2 py-0.5 rounded-full; }
+}
+
+/* Markdown content styles */
+.prose-custom h1, .prose-custom h2, .prose-custom h3 {
+  color: #e2e8f0;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+.prose-custom h1 { font-size: 1.5rem; border-bottom: 1px solid #2d2d2d; padding-bottom: 0.5rem; }
+.prose-custom h2 { font-size: 1.2rem; color: #94a3b8; }
+.prose-custom h3 { font-size: 1rem; }
+.prose-custom p { color: #cbd5e1; line-height: 1.75; margin-bottom: 0.75rem; }
+.prose-custom ul, .prose-custom ol { color: #cbd5e1; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.prose-custom li { margin-bottom: 0.25rem; }
+.prose-custom code {
+  background: #252525;
+  color: #f472b6;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+}
+.prose-custom pre {
+  background: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.prose-custom pre code {
+  background: none;
+  color: #e2e8f0;
+  padding: 0;
+  font-size: 0.875rem;
+}
+.prose-custom blockquote {
+  border-left: 3px solid #e94560;
+  padding-left: 1rem;
+  color: #94a3b8;
+  margin: 1rem 0;
+}
+.prose-custom strong { color: #f1f5f9; }
+.prose-custom table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.prose-custom th { background: #252525; color: #e2e8f0; padding: 0.5rem 1rem; text-align: left; }
+.prose-custom td { padding: 0.5rem 1rem; border-top: 1px solid #2d2d2d; color: #cbd5e1; }
