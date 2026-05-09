@@ -2,32 +2,16 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "🐳 Docker: запустить всё",
+      "label": "🚀 Запустить сервер (БЫСТРО)",
       "type": "shell",
-      "command": "docker compose up --build",
+      "command": "java -jar target/platform.jar",
       "group": { "kind": "build", "isDefault": true },
-      "presentation": { "reveal": "always", "panel": "new", "group": "docker" },
-      "problemMatcher": [],
-      "detail": "Собирает и запускает frontend + executor. Открой http://localhost:3000"
-    },
-    {
-      "label": "🐳 Docker: остановить",
-      "type": "shell",
-      "command": "docker compose down",
-      "presentation": { "reveal": "always", "panel": "shared" },
-      "problemMatcher": [],
-      "detail": "Останавливает все контейнеры"
-    },
-    {
-      "label": "🐳 Docker: пересобрать без кеша",
-      "type": "shell",
-      "command": "docker compose down && docker compose build --no-cache && docker compose up",
       "presentation": { "reveal": "always", "panel": "new" },
       "problemMatcher": [],
-      "detail": "Полная пересборка всех образов"
+      "detail": "Запустить уже собранный JAR. Открой http://localhost:3000"
     },
     {
-      "label": "☕ Maven: запустить сервер (порт 3000)",
+      "label": "☕ Maven: собрать + запустить (полная сборка)",
       "type": "shell",
       "command": "mvn package exec:exec",
       "group": "build",
@@ -36,20 +20,36 @@
       "detail": "Скачивает Node.js, собирает React, пакует JAR, запускает отдельный JVM"
     },
     {
-      "label": "☕ Maven: только собрать React (без запуска)",
+      "label": "⚡ Vite dev-сервер (hot-reload, порт 5173)",
       "type": "shell",
-      "command": "mvn generate-resources",
-      "presentation": { "reveal": "always", "panel": "shared" },
-      "problemMatcher": [],
-      "detail": "npm install + vite build → dist/"
-    },
-    {
-      "label": "⚡ npm: dev-сервер Vite (требует Node.js)",
-      "type": "shell",
-      "command": "npm run dev",
+      "command": "${workspaceFolder}/node/npm.cmd run dev",
       "presentation": { "reveal": "always", "panel": "new", "group": "npm" },
       "problemMatcher": [],
-      "detail": "Быстрый hot-reload. Нужен Node.js глобально"
+      "detail": "Hot-reload фронтенда. Запускай параллельно с '🚀 Запустить сервер'. Открой http://localhost:5173"
+    },
+    {
+      "label": "☕ Maven: только собрать (без запуска)",
+      "type": "shell",
+      "command": "mvn package -DskipTests",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "detail": "npm build + javac + JAR. Не запускает сервер."
+    },
+    {
+      "label": "🐳 Docker: запустить всё",
+      "type": "shell",
+      "command": "docker compose up --build",
+      "presentation": { "reveal": "always", "panel": "new", "group": "docker" },
+      "problemMatcher": [],
+      "detail": "Собирает и запускает в Docker. Открой http://localhost:3000"
+    },
+    {
+      "label": "🐳 Docker: остановить",
+      "type": "shell",
+      "command": "docker compose down",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "detail": "Останавливает все контейнеры"
     }
   ]
 }
