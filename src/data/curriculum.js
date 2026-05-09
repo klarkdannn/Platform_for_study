@@ -977,6 +977,1019 @@ Client c = client.orElseThrow(() -> new ClientNotFoundException(id));
     `
   },
 
+  l13: {
+    title: 'Урок 13: Структуры данных',
+    content: `
+# Структуры данных своими руками
+
+## LinkedList (связный список)
+
+\`\`\`java
+public class LinkedList<T> {
+    private static class Node<T> {
+        T data;
+        Node<T> next;
+        Node(T data) { this.data = data; }
+    }
+
+    private Node<T> head;
+    private int size;
+
+    public void addFirst(T value) {
+        Node<T> node = new Node<>(value);
+        node.next = head;
+        head = node;
+        size++;
+    }
+
+    public T removeFirst() {
+        if (head == null) throw new NoSuchElementException();
+        T val = head.data;
+        head = head.next;
+        size--;
+        return val;
+    }
+
+    public int size() { return size; }
+}
+\`\`\`
+
+## Stack (стек) — LIFO
+
+\`\`\`java
+// Реализация через ArrayDeque (встроенная, быстрая)
+Deque<String> stack = new ArrayDeque<>();
+stack.push("операция1");    // добавить наверх
+stack.push("операция2");
+stack.peek();               // посмотреть верхний: "операция2"
+stack.pop();                // снять верхний: "операция2"
+
+// Применение: проверка скобок
+boolean isBalanced(String s) {
+    Deque<Character> st = new ArrayDeque<>();
+    for (char c : s.toCharArray()) {
+        if (c == '(' || c == '[') st.push(c);
+        else if (c == ')' && (st.isEmpty() || st.pop() != '(')) return false;
+        else if (c == ']' && (st.isEmpty() || st.pop() != '[')) return false;
+    }
+    return st.isEmpty();
+}
+\`\`\`
+
+## Queue (очередь) — FIFO
+
+\`\`\`java
+Queue<String> queue = new LinkedList<>();
+queue.offer("задача1");     // добавить в конец
+queue.offer("задача2");
+queue.peek();               // посмотреть первый
+queue.poll();               // взять первый: "задача1"
+\`\`\`
+
+## HashMap — как работает внутри
+
+\`\`\`
+1. key.hashCode() → вычислить хэш
+2. hash % capacity → индекс бакета
+3. Если бакет занят → сравнить через equals()
+4. При коллизии → цепочка / красно-чёрное дерево (Java 8+)
+5. При load factor > 0.75 → resize (×2)
+\`\`\`
+
+\`\`\`java
+// Своя упрощённая HashMap
+public class SimpleMap<K, V> {
+    private Object[][] buckets = new Object[16][];
+
+    public void put(K key, V value) {
+        int idx = Math.abs(key.hashCode()) % buckets.length;
+        // ... добавить в бакет
+    }
+}
+\`\`\`
+
+## Бинарное дерево поиска (BST)
+
+\`\`\`java
+class BST {
+    record Node(int val, Node left, Node right) {}
+
+    Node insert(Node root, int val) {
+        if (root == null) return new Node(val, null, null);
+        if (val < root.val()) return new Node(root.val(), insert(root.left(), val), root.right());
+        if (val > root.val()) return new Node(root.val(), root.left(), insert(root.right(), val));
+        return root; // duplicate
+    }
+
+    void inOrder(Node root) {        // обход → отсортированный вывод
+        if (root == null) return;
+        inOrder(root.left());
+        System.out.print(root.val() + " ");
+        inOrder(root.right());
+    }
+}
+\`\`\`
+
+## Когда что использовать?
+
+| Задача | Структура |
+|--------|-----------|
+| Быстрый доступ по индексу | ArrayList / массив |
+| Частые вставки/удаления в середину | LinkedList |
+| Уникальные значения | HashSet |
+| Отсортированные уникальные значения | TreeSet |
+| Пары ключ-значение | HashMap |
+| Стек (LIFO) | ArrayDeque |
+| Очередь (FIFO) | ArrayDeque / LinkedList |
+    `
+  },
+
+  l15: {
+    title: 'Урок 15: Generics',
+    content: `
+# Дженерики (Generics)
+
+## Зачем нужны
+
+\`\`\`java
+// Без дженериков — ClassCastException в рантайме!
+List list = new ArrayList();
+list.add("Алиса");
+list.add(42);
+String name = (String) list.get(1); // ← ClassCastException!
+
+// С дженериками — ошибка компиляции (безопасно)
+List<String> names = new ArrayList<>();
+names.add("Алиса");
+names.add(42); // ← ошибка компиляции
+\`\`\`
+
+## Generic класс
+
+\`\`\`java
+public class Repository<T> {
+    private final List<T> items = new ArrayList<>();
+
+    public void add(T item) { items.add(item); }
+
+    public Optional<T> findById(String id) {
+        return items.stream()
+            .filter(item -> item.getId().equals(id))
+            .findFirst();
+    }
+
+    public List<T> findAll() { return Collections.unmodifiableList(items); }
+}
+
+// Использование
+Repository<Client> clients = new Repository<>();
+Repository<Account> accounts = new Repository<>();
+\`\`\`
+
+## Generic метод
+
+\`\`\`java
+public static <T extends Comparable<T>> T max(T a, T b) {
+    return a.compareTo(b) >= 0 ? a : b;
+}
+
+String s = max("abc", "xyz");    // "xyz"
+Integer n = max(42, 100);        // 100
+\`\`\`
+
+## Wildcards (символы подстановки)
+
+\`\`\`java
+// ? extends T — можно только читать (producer)
+double totalBalance(List<? extends Account> accounts) {
+    return accounts.stream().mapToDouble(Account::getBalance).sum();
+}
+
+// ? super T — можно только добавлять (consumer)
+void addAll(List<? super Client> target, List<Client> source) {
+    target.addAll(source);
+}
+
+// Правило PECS: Producer → extends, Consumer → super
+\`\`\`
+
+## Bounded type parameters
+
+\`\`\`java
+// T должен реализовывать Comparable
+public <T extends Comparable<T>> T findMin(List<T> list) {
+    return list.stream().min(Comparator.naturalOrder()).orElseThrow();
+}
+
+// T должен быть Account и Serializable
+public <T extends Account & Serializable> void save(T account) { ... }
+\`\`\`
+
+## Type Erasure
+
+\`\`\`java
+// Дженерики существуют только при компиляции!
+// В байт-коде List<String> и List<Integer> — одно и то же: List
+// Поэтому нельзя: new T(), T.class, instanceof List<String>
+\`\`\`
+    `
+  },
+
+  l16: {
+    title: 'Урок 16: Паттерны проектирования',
+    content: `
+# Паттерны проектирования (Design Patterns)
+
+## Singleton — один объект на всю программу
+
+\`\`\`java
+// Thread-safe Singleton через enum (рекомендуется)
+public enum DatabaseConfig {
+    INSTANCE;
+    private final String url = System.getenv("DB_URL");
+    public String getUrl() { return url; }
+}
+
+// Использование
+DatabaseConfig.INSTANCE.getUrl();
+
+// Через double-checked locking (классика)
+public class ConnectionPool {
+    private static volatile ConnectionPool instance;
+
+    private ConnectionPool() { /* инициализация пула */ }
+
+    public static ConnectionPool getInstance() {
+        if (instance == null) {
+            synchronized (ConnectionPool.class) {
+                if (instance == null) instance = new ConnectionPool();
+            }
+        }
+        return instance;
+    }
+}
+\`\`\`
+
+## Factory / Factory Method
+
+\`\`\`java
+public abstract class AccountFactory {
+    public abstract Account createAccount(String owner, double balance);
+
+    // Factory Method
+    public static Account of(String type, String owner, double balance) {
+        return switch (type) {
+            case "DEBIT"   -> new DebitAccount(owner, balance);
+            case "CREDIT"  -> new CreditAccount(owner, balance, 100_000);
+            case "SAVINGS" -> new SavingsAccount(owner, balance, 0.08);
+            default -> throw new IllegalArgumentException("Неизвестный тип: " + type);
+        };
+    }
+}
+\`\`\`
+
+## Builder — пошаговое создание объекта
+
+\`\`\`java
+public class TransactionRequest {
+    private final String fromAccount;
+    private final String toAccount;
+    private final BigDecimal amount;
+    private final String description;
+    private final boolean notify;
+
+    private TransactionRequest(Builder b) {
+        this.fromAccount = b.fromAccount;
+        this.toAccount   = b.toAccount;
+        this.amount      = b.amount;
+        this.description = b.description;
+        this.notify      = b.notify;
+    }
+
+    public static class Builder {
+        private final String fromAccount;
+        private final String toAccount;
+        private final BigDecimal amount;
+        private String description = "";
+        private boolean notify = false;
+
+        public Builder(String from, String to, BigDecimal amount) {
+            this.fromAccount = from; this.toAccount = to; this.amount = amount;
+        }
+        public Builder description(String d) { this.description = d; return this; }
+        public Builder notify(boolean n)     { this.notify = n; return this; }
+        public TransactionRequest build()    { return new TransactionRequest(this); }
+    }
+}
+
+// Использование
+var req = new TransactionRequest.Builder("ACC001", "ACC002", new BigDecimal("5000"))
+    .description("Оплата аренды")
+    .notify(true)
+    .build();
+\`\`\`
+
+## Observer — подписка на события
+
+\`\`\`java
+// Встроенный в Java: EventListener pattern
+interface TransactionListener {
+    void onTransaction(Transaction tx);
+}
+
+class NotificationService implements TransactionListener {
+    @Override
+    public void onTransaction(Transaction tx) {
+        System.out.println("SMS: " + tx.amount() + " руб. на " + tx.account());
+    }
+}
+
+class Account {
+    private final List<TransactionListener> listeners = new ArrayList<>();
+
+    public void addListener(TransactionListener l) { listeners.add(l); }
+
+    public void transfer(Account to, BigDecimal amount) {
+        balance = balance.subtract(amount);
+        to.balance = to.balance.add(amount);
+        var tx = new Transaction(id, to.id, amount);
+        listeners.forEach(l -> l.onTransaction(tx));
+    }
+}
+\`\`\`
+
+## Strategy — сменный алгоритм
+
+\`\`\`java
+@FunctionalInterface
+interface FeeStrategy {
+    BigDecimal calculate(BigDecimal amount);
+}
+
+class TransactionService {
+    private FeeStrategy feeStrategy;
+
+    public void setFeeStrategy(FeeStrategy strategy) { this.feeStrategy = strategy; }
+
+    public void process(BigDecimal amount) {
+        BigDecimal fee = feeStrategy.calculate(amount);
+        System.out.println("Комиссия: " + fee);
+    }
+}
+
+// Использование с лямбдами
+service.setFeeStrategy(amount -> amount.multiply(new BigDecimal("0.01")));   // 1%
+service.setFeeStrategy(amount -> new BigDecimal("50"));                       // фиксированная
+service.setFeeStrategy(amount -> amount.compareTo(new BigDecimal("10000")) > 0
+    ? amount.multiply(new BigDecimal("0.005"))   // 0.5% для крупных
+    : new BigDecimal("50"));                      // 50 руб. для мелких
+\`\`\`
+    `
+  },
+
+  l17: {
+    title: 'Урок 17: Потоки и Concurrency',
+    content: `
+# Многопоточность (Concurrency)
+
+## Thread — создание потока
+
+\`\`\`java
+// Способ 1: Runnable (рекомендуется)
+Thread t = new Thread(() -> {
+    System.out.println("Поток: " + Thread.currentThread().getName());
+});
+t.start();
+t.join();  // подождать завершения
+
+// Способ 2: extends Thread (редко используется)
+class WorkerThread extends Thread {
+    @Override
+    public void run() { /* ... */ }
+}
+\`\`\`
+
+## ExecutorService — пул потоков
+
+\`\`\`java
+// Фиксированный пул из 4 потоков
+ExecutorService pool = Executors.newFixedThreadPool(4);
+
+// Отправить задачу
+Future<BigDecimal> future = pool.submit(() -> {
+    return calculateInterest(accountId);  // возвращает результат
+});
+
+BigDecimal result = future.get(5, TimeUnit.SECONDS);  // подождать результат
+
+pool.shutdown();  // мягкая остановка (ждёт задачи)
+pool.awaitTermination(10, TimeUnit.SECONDS);
+\`\`\`
+
+## Проблема гонки (Race Condition)
+
+\`\`\`java
+// НЕБЕЗОПАСНО — два потока одновременно меняют баланс!
+class UnsafeAccount {
+    private double balance = 1000;
+
+    void deposit(double amount) {
+        balance += amount;  // НЕ атомарная операция!
+    }
+}
+
+// БЕЗОПАСНО 1: synchronized
+class SafeAccount {
+    private double balance = 1000;
+
+    synchronized void deposit(double amount) { balance += amount; }
+    synchronized void withdraw(double amount) {
+        if (amount > balance) throw new IllegalStateException();
+        balance -= amount;
+    }
+}
+
+// БЕЗОПАСНО 2: ReentrantLock (гибче)
+class LockAccount {
+    private final ReentrantLock lock = new ReentrantLock();
+    private double balance;
+
+    void deposit(double amount) {
+        lock.lock();
+        try { balance += amount; }
+        finally { lock.unlock(); }
+    }
+}
+\`\`\`
+
+## AtomicInteger, AtomicLong
+
+\`\`\`java
+// Счётчик транзакций — потокобезопасный без synchronized
+AtomicLong txCounter = new AtomicLong(0);
+long txId = txCounter.incrementAndGet();
+
+// CAS (compare-and-swap) — основа атомиков
+AtomicInteger version = new AtomicInteger(1);
+boolean updated = version.compareAndSet(1, 2);  // если == 1, поставить 2
+\`\`\`
+
+## Virtual Threads (Java 21) — революция
+
+\`\`\`java
+// До Java 21: каждый поток = OS thread (дорого, ~1MB стека)
+// Java 21: виртуальные потоки — миллионы потоков на JVM!
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (int i = 0; i < 100_000; i++) {
+        final int id = i;
+        executor.submit(() -> processAccount(id));
+    }
+}
+\`\`\`
+
+## Deadlock — как избежать
+
+\`\`\`java
+// DEADLOCK: поток 1 держит lockA, ждёт lockB
+//            поток 2 держит lockB, ждёт lockA
+
+// Решение: всегда захватывать блокировки в одном порядке!
+void transfer(Account from, Account to, double amount) {
+    Account first  = from.id < to.id ? from : to;
+    Account second = from.id < to.id ? to : from;
+    synchronized (first) {
+        synchronized (second) {
+            from.balance -= amount;
+            to.balance   += amount;
+        }
+    }
+}
+\`\`\`
+    `
+  },
+
+  l18: {
+    title: 'Урок 18: Асинхронность',
+    content: `
+# CompletableFuture — асинхронное программирование
+
+## Основы
+
+\`\`\`java
+// Запустить задачу асинхронно (в ForkJoinPool)
+CompletableFuture<BigDecimal> cf = CompletableFuture.supplyAsync(() -> {
+    return fetchBalanceFromDB(accountId);  // не блокирует текущий поток
+});
+
+// Получить результат (блокирует текущий поток!)
+BigDecimal balance = cf.get();
+
+// Лучше — обработать когда готово:
+cf.thenAccept(balance -> System.out.println("Баланс: " + balance));
+\`\`\`
+
+## Цепочка операций
+
+\`\`\`java
+CompletableFuture<String> report = CompletableFuture
+    .supplyAsync(() -> fetchClient(clientId))           // получить клиента
+    .thenApply(client -> fetchAccounts(client.getId()))  // получить счета
+    .thenApply(accounts -> generateReport(accounts))     // создать отчёт
+    .exceptionally(ex -> "Ошибка: " + ex.getMessage()); // обработать ошибку
+
+// Методы трансформации:
+// thenApply(fn)   — как map() в Stream, не асинхронно
+// thenCompose(fn) — как flatMap(), для вложенных CF
+// thenAccept(fn)  — получить результат, ничего не возвращать
+// thenRun(fn)     — запустить после завершения, без результата
+\`\`\`
+
+## Несколько задач параллельно
+
+\`\`\`java
+CompletableFuture<Client>  clientCF  = CompletableFuture.supplyAsync(() -> fetchClient(id));
+CompletableFuture<Account> accountCF = CompletableFuture.supplyAsync(() -> fetchAccount(id));
+CompletableFuture<List<Transaction>> txCF = CompletableFuture.supplyAsync(() -> fetchTx(id));
+
+// Дождаться ВСЕХ (как Promise.all)
+CompletableFuture.allOf(clientCF, accountCF, txCF).join();
+Client  client  = clientCF.join();
+Account account = accountCF.join();
+
+// Взять ПЕРВЫЙ результат (как Promise.race)
+CompletableFuture<String> fastest = CompletableFuture.anyOf(cache1CF, cache2CF)
+    .thenApply(obj -> (String) obj);
+\`\`\`
+
+## Обработка ошибок
+
+\`\`\`java
+CompletableFuture<BigDecimal> result = CompletableFuture
+    .supplyAsync(() -> {
+        if (network.isDown()) throw new RuntimeException("Сеть недоступна");
+        return fetchBalance();
+    })
+    .handle((balance, ex) -> {
+        if (ex != null) {
+            log.error("Ошибка: " + ex.getMessage());
+            return BigDecimal.ZERO;  // дефолтное значение
+        }
+        return balance;
+    });
+\`\`\`
+
+## Timeout (Java 9+)
+
+\`\`\`java
+CompletableFuture<String> withTimeout = CompletableFuture
+    .supplyAsync(() -> slowOperation())
+    .orTimeout(3, TimeUnit.SECONDS)           // исключение если > 3с
+    .completeOnTimeout("дефолт", 3, TimeUnit.SECONDS); // значение если > 3с
+\`\`\`
+    `
+  },
+
+  l19: {
+    title: 'Урок 19: Spring Core & DI',
+    content: `
+# Spring Boot — основы
+
+## Что такое Spring Boot
+
+Spring Boot = Spring Framework + автоконфигурация + embedded Tomcat
+
+\`\`\`java
+@SpringBootApplication  // = @Configuration + @EnableAutoConfiguration + @ComponentScan
+public class BankApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(BankApplication.class, args);
+    }
+}
+\`\`\`
+
+## Dependency Injection (DI) — внедрение зависимостей
+
+\`\`\`java
+// Компонент — бин Spring
+@Service
+public class TransactionService {
+    private final AccountRepository accountRepo;
+    private final NotificationService notifications;
+
+    // Внедрение через конструктор (рекомендуется)
+    public TransactionService(AccountRepository accountRepo,
+                               NotificationService notifications) {
+        this.accountRepo   = accountRepo;
+        this.notifications = notifications;
+    }
+
+    public void transfer(String fromId, String toId, BigDecimal amount) {
+        Account from = accountRepo.findById(fromId).orElseThrow();
+        Account to   = accountRepo.findById(toId).orElseThrow();
+        from.withdraw(amount);
+        to.deposit(amount);
+        accountRepo.save(from);
+        accountRepo.save(to);
+        notifications.sendAlert(fromId, "Перевод " + amount + " выполнен");
+    }
+}
+\`\`\`
+
+## Аннотации бинов
+
+| Аннотация | Назначение |
+|-----------|-----------|
+| \`@Component\` | Любой бин |
+| \`@Service\` | Бизнес-логика |
+| \`@Repository\` | Работа с БД |
+| \`@Controller\` / \`@RestController\` | HTTP-обработчики |
+| \`@Configuration\` | Конфигурационный класс |
+
+## Жизненный цикл бина
+
+\`\`\`java
+@Service
+public class CacheService {
+    @PostConstruct
+    void init() {
+        // Выполнится после создания бина и внедрения зависимостей
+        loadFromDB();
+    }
+
+    @PreDestroy
+    void cleanup() {
+        // Выполнится перед уничтожением бина
+        flushToCache();
+    }
+}
+\`\`\`
+
+## application.properties / application.yml
+
+\`\`\`yaml
+# application.yml
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bankdb
+    username: \${DB_USER:postgres}
+    password: \${DB_PASS:secret}
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: validate
+
+bank:
+  max-transfer-amount: 1000000
+  fee-rate: 0.01
+\`\`\`
+
+\`\`\`java
+@Value("\${bank.fee-rate}")
+private BigDecimal feeRate;
+
+// Или через @ConfigurationProperties
+@ConfigurationProperties(prefix = "bank")
+public record BankConfig(BigDecimal maxTransferAmount, BigDecimal feeRate) {}
+\`\`\`
+    `
+  },
+
+  l20: {
+    title: 'Урок 20: Spring MVC & REST API',
+    content: `
+# Spring MVC — REST API
+
+## @RestController
+
+\`\`\`java
+@RestController
+@RequestMapping("/api/accounts")
+public class AccountController {
+    private final AccountService service;
+
+    public AccountController(AccountService service) {
+        this.service = service;
+    }
+
+    // GET /api/accounts
+    @GetMapping
+    public List<AccountDto> getAllAccounts() {
+        return service.findAll();
+    }
+
+    // GET /api/accounts/{id}
+    @GetMapping("/{id}")
+    public AccountDto getAccount(@PathVariable String id) {
+        return service.findById(id)
+            .orElseThrow(() -> new AccountNotFoundException(id));
+    }
+
+    // POST /api/accounts
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public AccountDto createAccount(@Valid @RequestBody CreateAccountRequest req) {
+        return service.create(req);
+    }
+
+    // PUT /api/accounts/{id}/deposit
+    @PutMapping("/{id}/deposit")
+    public AccountDto deposit(@PathVariable String id,
+                               @RequestBody DepositRequest req) {
+        return service.deposit(id, req.amount());
+    }
+
+    // DELETE /api/accounts/{id}
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAccount(@PathVariable String id) {
+        service.delete(id);
+    }
+}
+\`\`\`
+
+## Request / Response DTO
+
+\`\`\`java
+// Запрос
+public record CreateAccountRequest(
+    @NotBlank String owner,
+    @NotNull @DecimalMin("0") BigDecimal initialBalance,
+    @NotBlank String type
+) {}
+
+// Ответ
+public record AccountDto(
+    String id,
+    String owner,
+    BigDecimal balance,
+    String type,
+    LocalDateTime createdAt
+) {}
+\`\`\`
+
+## Обработка ошибок
+
+\`\`\`java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNotFound(AccountNotFoundException ex) {
+        return new ErrorResponse("NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleValidation(MethodArgumentNotValidException ex) {
+        String msg = ex.getBindingResult().getFieldErrors().stream()
+            .map(e -> e.getField() + ": " + e.getDefaultMessage())
+            .collect(Collectors.joining(", "));
+        return new ErrorResponse("VALIDATION_ERROR", msg);
+    }
+
+    record ErrorResponse(String code, String message) {}
+}
+\`\`\`
+
+## Query параметры и фильтрация
+
+\`\`\`java
+// GET /api/transactions?account=ACC001&from=2024-01-01&limit=50
+@GetMapping("/transactions")
+public Page<TransactionDto> getTransactions(
+    @RequestParam String account,
+    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+    @RequestParam(defaultValue = "50") int limit,
+    Pageable pageable
+) {
+    return transactionService.findByAccount(account, from, pageable);
+}
+\`\`\`
+    `
+  },
+
+  l21: {
+    title: 'Урок 21: Spring Data JPA',
+    content: `
+# Spring Data JPA
+
+## Entity — объект базы данных
+
+\`\`\`java
+@Entity
+@Table(name = "accounts")
+public class Account {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String owner;
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal balance;
+
+    @Enumerated(EnumType.STRING)
+    private AccountType type;  // DEBIT, CREDIT, SAVINGS
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @Version
+    private int version;  // Optimistic locking
+
+    // геттеры/сеттеры...
+}
+\`\`\`
+
+## Отношения между сущностями
+
+\`\`\`java
+@Entity
+public class Client {
+    @Id @GeneratedValue
+    private Long id;
+    private String name;
+
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Account> accounts = new ArrayList<>();
+}
+
+@Entity
+public class Account {
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id")
+    private Client client;
+
+    @OneToMany(mappedBy = "account", cascade = CascadeType.ALL)
+    private List<Transaction> transactions = new ArrayList<>();
+}
+\`\`\`
+
+## Repository
+
+\`\`\`java
+@Repository
+public interface AccountRepository extends JpaRepository<Account, Long> {
+    // Spring генерирует SQL из имени метода!
+    List<Account> findByOwner(String owner);
+    List<Account> findByBalanceGreaterThan(BigDecimal amount);
+    Optional<Account> findByIdAndType(Long id, AccountType type);
+    long countByType(AccountType type);
+
+    // Кастомный JPQL
+    @Query("SELECT a FROM Account a WHERE a.balance > :min ORDER BY a.balance DESC")
+    List<Account> findRichAccounts(@Param("min") BigDecimal min);
+
+    // Нативный SQL
+    @Query(value = "SELECT * FROM accounts WHERE owner ILIKE :name", nativeQuery = true)
+    List<Account> searchByName(@Param("name") String name);
+}
+\`\`\`
+
+## Транзакции
+
+\`\`\`java
+@Service
+@Transactional
+public class TransactionService {
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void transfer(Long fromId, Long toId, BigDecimal amount) {
+        Account from = accountRepo.findById(fromId).orElseThrow();
+        Account to   = accountRepo.findById(toId).orElseThrow();
+
+        if (from.getBalance().compareTo(amount) < 0)
+            throw new InsufficientFundsException();
+
+        from.setBalance(from.getBalance().subtract(amount));
+        to.setBalance(to.getBalance().add(amount));
+        // JPA автоматически сохранит изменения в конце транзакции (dirty checking)
+    }
+
+    @Transactional(readOnly = true)  // оптимизация — нет dirty checking
+    public List<Account> getAccounts() {
+        return accountRepo.findAll();
+    }
+}
+\`\`\`
+    `
+  },
+
+  l22: {
+    title: 'Урок 22: Spring Security',
+    content: `
+# Spring Security — аутентификация и авторизация
+
+## Базовая конфигурация (JWT)
+
+\`\`\`java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        return http
+            .csrf(csrf -> csrf.disable())   // для REST API
+            .sessionManagement(s -> s.sessionCreationPolicy(STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/accounts/**").authenticated()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);  // cost factor 12
+    }
+}
+\`\`\`
+
+## JWT Token
+
+\`\`\`java
+// Зависимость: io.jsonwebtoken:jjwt-api
+@Component
+public class JwtService {
+    @Value("\${jwt.secret}") private String secret;
+    @Value("\${jwt.expiration}") private long expiration;
+
+    public String generateToken(UserDetails user) {
+        return Jwts.builder()
+            .subject(user.getUsername())
+            .claim("roles", user.getAuthorities())
+            .issuedAt(new Date())
+            .expiration(new Date(System.currentTimeMillis() + expiration))
+            .signWith(getKey())
+            .compact();
+    }
+
+    public boolean isValid(String token, UserDetails user) {
+        String username = extractUsername(token);
+        return username.equals(user.getUsername()) && !isExpired(token);
+    }
+
+    private SecretKey getKey() {
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+    }
+}
+\`\`\`
+
+## Контроллер аутентификации
+
+\`\`\`java
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest req) {
+        var user = new User(req.email(),
+            passwordEncoder.encode(req.password()), List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        userRepo.save(user);
+        return ResponseEntity.ok(new AuthResponse(jwtService.generateToken(user)));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest req) {
+        authManager.authenticate(
+            new UsernamePasswordAuthenticationToken(req.email(), req.password()));
+        var user = userRepo.findByEmail(req.email()).orElseThrow();
+        return ResponseEntity.ok(new AuthResponse(jwtService.generateToken(user)));
+    }
+}
+\`\`\`
+
+## Защита методов аннотациями
+
+\`\`\`java
+@EnableMethodSecurity  // в Security конфиге
+...
+
+@Service
+public class AccountService {
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.name")
+    public Account getAccount(String userId, Long accountId) { ... }
+
+    @PostAuthorize("returnObject.owner == authentication.name")
+    public Account findById(Long id) { ... }
+
+    @Secured("ROLE_ADMIN")
+    public void deleteAccount(Long id) { ... }
+}
+\`\`\`
+    `
+  },
+
   l23: {
     title: 'Урок 23: SQL Основы',
     content: `
@@ -1054,6 +2067,246 @@ try (Connection conn = DriverManager.getConnection(url, user, pass);
         System.out.println(rs.getString("owner") + ": " + rs.getDouble("balance"));
     }
 }
+\`\`\`
+    `
+  },
+
+  l24: {
+    title: 'Урок 24: PostgreSQL & JDBC',
+    content: `
+# PostgreSQL & JDBC
+
+## Подключение к PostgreSQL
+
+\`\`\`xml
+<!-- pom.xml -->
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+    <version>42.7.1</version>
+</dependency>
+\`\`\`
+
+\`\`\`java
+String url  = "jdbc:postgresql://localhost:5432/bankdb";
+String user = "postgres";
+String pass = "secret";
+
+Connection conn = DriverManager.getConnection(url, user, pass);
+\`\`\`
+
+## Connection Pool (HikariCP) — обязательно для продакшна
+
+\`\`\`java
+// В Spring Boot подключается автоматически
+// application.yml:
+// spring.datasource.url: jdbc:postgresql://localhost/bankdb
+// spring.datasource.hikari.maximum-pool-size: 10
+
+// Ручная настройка
+HikariConfig config = new HikariConfig();
+config.setJdbcUrl("jdbc:postgresql://localhost:5432/bankdb");
+config.setMaximumPoolSize(10);
+config.setMinimumIdle(2);
+config.setConnectionTimeout(30_000);
+DataSource ds = new HikariDataSource(config);
+\`\`\`
+
+## PreparedStatement — безопасные запросы
+
+\`\`\`java
+// НИКОГДА не делай так! — SQL Injection!
+String bad = "SELECT * FROM users WHERE name = '" + name + "'";
+
+// ПРАВИЛЬНО — параметры через ?
+try (Connection conn = ds.getConnection();
+     PreparedStatement ps = conn.prepareStatement(
+         "INSERT INTO transactions(from_id, to_id, amount, note) VALUES (?, ?, ?, ?)")) {
+
+    ps.setString(1, fromId);
+    ps.setString(2, toId);
+    ps.setBigDecimal(3, amount);
+    ps.setString(4, note);
+    int rows = ps.executeUpdate();  // возвращает кол-во изменённых строк
+}
+\`\`\`
+
+## Транзакции в JDBC
+
+\`\`\`java
+Connection conn = ds.getConnection();
+conn.setAutoCommit(false);  // отключить автокоммит!
+try {
+    // Снять с первого счёта
+    try (PreparedStatement ps = conn.prepareStatement(
+            "UPDATE accounts SET balance = balance - ? WHERE id = ?")) {
+        ps.setBigDecimal(1, amount);
+        ps.setString(2, fromId);
+        ps.executeUpdate();
+    }
+    // Зачислить на второй
+    try (PreparedStatement ps = conn.prepareStatement(
+            "UPDATE accounts SET balance = balance + ? WHERE id = ?")) {
+        ps.setBigDecimal(1, amount);
+        ps.setString(2, toId);
+        ps.executeUpdate();
+    }
+    conn.commit();
+} catch (Exception e) {
+    conn.rollback();  // откатить если ошибка!
+    throw e;
+} finally {
+    conn.setAutoCommit(true);
+    conn.close();
+}
+\`\`\`
+
+## Полезные фичи PostgreSQL
+
+\`\`\`sql
+-- UUID как первичный ключ
+CREATE TABLE accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner TEXT NOT NULL,
+    balance NUMERIC(15,2) NOT NULL DEFAULT 0
+);
+
+-- JSONB — хранение JSON с поиском
+ALTER TABLE clients ADD COLUMN metadata JSONB;
+SELECT * FROM clients WHERE metadata->>'vip' = 'true';
+
+-- Полнотекстовый поиск
+SELECT * FROM clients WHERE to_tsvector('russian', name) @@ to_tsquery('russian', 'Иванов');
+
+-- EXPLAIN ANALYZE — анализ запроса
+EXPLAIN ANALYZE SELECT * FROM accounts WHERE owner = 'Алиса';
+\`\`\`
+    `
+  },
+
+  l25: {
+    title: 'Урок 25: JPA & Hibernate',
+    content: `
+# JPA & Hibernate — ORM в Java
+
+## Что такое ORM
+
+ORM (Object-Relational Mapping) — автоматическое отображение таблиц БД в Java-классы.
+
+\`\`\`
+БД таблица accounts    ←→   Java класс Account
+  id BIGINT            ←→   Long id
+  owner VARCHAR        ←→   String owner
+  balance NUMERIC      ←→   BigDecimal balance
+\`\`\`
+
+## Маппинг связей
+
+\`\`\`java
+// One-to-Many: Клиент имеет много счетов
+@Entity
+public class Client {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Account> accounts = new ArrayList<>();
+
+    public void addAccount(Account account) {
+        accounts.add(account);
+        account.setClient(this);  // синхронизировать обе стороны!
+    }
+}
+
+// Many-to-Many: Клиент имеет много продуктов, продукт у многих клиентов
+@Entity
+public class Client {
+    @ManyToMany
+    @JoinTable(name = "client_products",
+        joinColumns = @JoinColumn(name = "client_id"),
+        inverseJoinColumns = @JoinColumn(name = "product_id"))
+    private Set<Product> products = new HashSet<>();
+}
+\`\`\`
+
+## Проблема N+1 запросов
+
+\`\`\`java
+// ПЛОХО — 1 запрос для клиентов + N запросов для счетов каждого!
+List<Client> clients = clientRepo.findAll();
+for (Client c : clients) {
+    System.out.println(c.getAccounts().size()); // lazy load = доп. запрос!
+}
+
+// ХОРОШО — JOIN FETCH = один запрос
+@Query("SELECT c FROM Client c LEFT JOIN FETCH c.accounts")
+List<Client> findAllWithAccounts();
+
+// Или @EntityGraph
+@EntityGraph(attributePaths = {"accounts", "accounts.transactions"})
+List<Client> findAll();
+\`\`\`
+
+## Inheritance стратегии
+
+\`\`\`java
+// SINGLE_TABLE — все подклассы в одной таблице (быстрее, NULL в столбцах)
+@Entity
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "account_type")
+public abstract class Account { ... }
+
+@Entity @DiscriminatorValue("CREDIT")
+public class CreditAccount extends Account {
+    private BigDecimal creditLimit;
+}
+
+// JOINED — отдельная таблица для каждого (нормализация, JOIN при выборке)
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
+public abstract class Account { ... }
+\`\`\`
+
+## Кэширование (2nd Level Cache)
+
+\`\`\`java
+// 1st level cache: встроен в EntityManager (сессию), автоматически
+// 2nd level cache: между сессиями, нужно настраивать
+
+@Entity
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+public class Account { ... }
+
+// application.yml
+// spring.jpa.properties.hibernate.cache.use_second_level_cache: true
+// spring.jpa.properties.hibernate.cache.region.factory_class: jcache
+\`\`\`
+
+## Audit — кто и когда изменил
+
+\`\`\`java
+@MappedSuperclass
+@EntityListeners(AuditingEntityListener.class)
+public abstract class Auditable {
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+
+    @CreatedBy
+    private String createdBy;
+
+    @LastModifiedBy
+    private String updatedBy;
+}
+
+@Entity
+public class Account extends Auditable { ... }
+
+// В конфиге
+@EnableJpaAuditing(auditorAwareRef = "auditorProvider")
 \`\`\`
     `
   },

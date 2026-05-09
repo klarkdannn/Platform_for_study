@@ -152,8 +152,14 @@ public class Server {
         }
 
         byte[] bytes = Files.readAllBytes(file);
-        ex.getResponseHeaders().set("Content-Type",  contentType(file.getFileName().toString()));
-        ex.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
+        String fname = file.getFileName().toString();
+        ex.getResponseHeaders().set("Content-Type",  contentType(fname));
+        // index.html: no-cache so browser always checks for new builds
+        // hashed assets (*.js, *.css): long cache since filename changes on rebuild
+        String cacheControl = fname.equals("index.html")
+            ? "no-cache, no-store, must-revalidate"
+            : "public, max-age=31536000, immutable";
+        ex.getResponseHeaders().set("Cache-Control", cacheControl);
         ex.sendResponseHeaders(200, bytes.length);
         try (var os = ex.getResponseBody()) { os.write(bytes); }
     }
