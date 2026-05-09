@@ -1,0 +1,27 @@
+services:
+
+  # Сервис выполнения Java-кода (компилирует + запускает)
+  executor:
+    build:
+      context: ./executor
+      dockerfile: Dockerfile
+    expose:
+      - "4000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # React SPA + Nginx (порт 3000 снаружи → 80 внутри)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      executor:
+        condition: service_healthy
+    restart: unless-stopped

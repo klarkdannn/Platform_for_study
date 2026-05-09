@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🐳 Docker: запустить всё",
+      "type": "shell",
+      "command": "docker compose up --build",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "new", "group": "docker" },
+      "problemMatcher": [],
+      "detail": "Собирает и запускает frontend + executor. Открой http://localhost:3000"
+    },
+    {
+      "label": "🐳 Docker: остановить",
+      "type": "shell",
+      "command": "docker compose down",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "detail": "Останавливает все контейнеры"
+    },
+    {
+      "label": "🐳 Docker: пересобрать без кеша",
+      "type": "shell",
+      "command": "docker compose down && docker compose build --no-cache && docker compose up",
+      "presentation": { "reveal": "always", "panel": "new" },
+      "problemMatcher": [],
+      "detail": "Полная пересборка всех образов"
+    },
+    {
+      "label": "☕ Maven: запустить сервер (порт 3000)",
+      "type": "shell",
+      "command": "mvn compile exec:java",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "new", "group": "maven" },
+      "problemMatcher": [],
+      "detail": "Скачивает Node.js, собирает React, запускает Java-сервер"
+    },
+    {
+      "label": "☕ Maven: только собрать React (без запуска)",
+      "type": "shell",
+      "command": "mvn generate-resources",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "detail": "npm install + vite build → dist/"
+    },
+    {
+      "label": "⚡ npm: dev-сервер Vite (требует Node.js)",
+      "type": "shell",
+      "command": "npm run dev",
+      "presentation": { "reveal": "always", "panel": "new", "group": "npm" },
+      "problemMatcher": [],
+      "detail": "Быстрый hot-reload. Нужен Node.js глобально"
+    }
+  ]
+}
