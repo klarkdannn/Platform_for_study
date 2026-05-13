@@ -1,0 +1,285 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║              СЛАЙДЫ: SPRING BOOT — ПУТЬ К REST API                  ║
+║              Как перейти от Java к реальному веб-сервису            ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 1: Что такое Spring Boot?
+────────────────────────────────────────────────────────────────────────
+
+    Spring Boot = Spring Framework + автоконфигурация
+
+    Spring Framework — огромная экосистема для Java:
+      Spring MVC  — веб-слой, REST API
+      Spring Data — работа с БД (JPA, JDBC)
+      Spring Security — аутентификация, авторизация
+
+    Spring Boot УПРОЩАЕТ настройку:
+    ┌────────────────────────────────────────────────┐
+    │  БЕЗ Boot: сотни строк XML конфигурации       │
+    │  С Boot:   @SpringBootApplication + run!       │
+    │                                                │
+    │  @SpringBootApplication                        │
+    │  public class BankApplication {               │
+    │      public static void main(String[] args) { │
+    │          SpringApplication.run(               │
+    │              BankApplication.class, args);    │
+    │      }                                         │
+    │  }                                             │
+    └────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 2: REST API — как работает?
+────────────────────────────────────────────────────────────────────────
+
+    HTTP — протокол запрос-ответ.
+
+    Клиент (Postman/Browser) → HTTP Request → Spring → Ответ
+
+    HTTP методы:
+    ┌────────┬──────────┬─────────────────────────────────┐
+    │ Метод  │ Действие │ Пример                          │
+    ├────────┼──────────┼─────────────────────────────────┤
+    │ GET    │ Читать   │ GET /api/accounts               │
+    │ POST   │ Создать  │ POST /api/accounts              │
+    │ PUT    │ Обновить │ PUT /api/accounts/123/deposit   │
+    │ DELETE │ Удалить  │ DELETE /api/accounts/123        │
+    └────────┴──────────┴─────────────────────────────────┘
+
+    HTTP коды ответа:
+    200 OK          — успех
+    201 Created     — создан новый ресурс
+    400 Bad Request — ошибка в запросе клиента
+    401 Unauthorized — не авторизован
+    403 Forbidden   — доступ запрещён
+    404 Not Found   — ресурс не найден
+    500 Internal Server Error — ошибка сервера
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 3: Архитектура Spring Boot приложения
+────────────────────────────────────────────────────────────────────────
+
+    Запрос клиента
+         ↓
+    ┌─────────────────────────────┐
+    │  @RestController            │  ← Принимает HTTP запросы
+    │  AccountController          │    Валидация входных данных
+    │  /api/accounts              │    Возвращает ResponseEntity<T>
+    └────────────┬────────────────┘
+                 ↓
+    ┌─────────────────────────────┐
+    │  @Service                   │  ← Бизнес-логика
+    │  AccountService             │    @Transactional методы
+    │                             │    Работает с несколькими репо
+    └────────────┬────────────────┘
+                 ↓
+    ┌─────────────────────────────┐
+    │  @Repository                │  ← Работа с БД
+    │  AccountRepository          │    extends JpaRepository<T, ID>
+    │                             │    SQL запросы через JPA/JPQL
+    └────────────┬────────────────┘
+                 ↓
+         PostgreSQL / H2
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 4: Controller — REST эндпоинты банка
+────────────────────────────────────────────────────────────────────────
+
+    @RestController
+    @RequestMapping("/api/accounts")
+    public class AccountController {
+
+        @Autowired
+        private AccountService accountService;
+
+        // GET /api/accounts → все счета
+        @GetMapping
+        public List<AccountDTO> getAll() {
+            return accountService.getAllAccounts();
+        }
+
+        // GET /api/accounts/ACC001 → счёт по ID
+        @GetMapping("/{id}")
+        public ResponseEntity<AccountDTO> getById(@PathVariable String id) {
+            return accountService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+        }
+
+        // POST /api/accounts → создать счёт
+        @PostMapping
+        @ResponseStatus(HttpStatus.CREATED)
+        public AccountDTO create(@Valid @RequestBody CreateAccountRequest req) {
+            return accountService.createAccount(req);
+        }
+
+        // PUT /api/accounts/ACC001/deposit → пополнить
+        @PutMapping("/{id}/deposit")
+        public AccountDTO deposit(
+                @PathVariable String id,
+                @RequestBody @Valid DepositRequest req) {
+            return accountService.deposit(id, req.amount(), req.description());
+        }
+
+        // POST /api/accounts/transfer → перевод
+        @PostMapping("/transfer")
+        public void transfer(@Valid @RequestBody TransferRequest req) {
+            accountService.transfer(req.fromId(), req.toId(),
+                                    req.amount(), req.description());
+        }
+    }
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 5: JPA Entity — сущность в базе данных
+────────────────────────────────────────────────────────────────────────
+
+    @Entity
+    @Table(name = "accounts")
+    public class AccountEntity {
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.UUID)
+        private String id;
+
+        @Column(nullable = false)
+        private String clientId;
+
+        @Column(nullable = false, precision = 19, scale = 2)
+        private BigDecimal balance;
+
+        @Enumerated(EnumType.STRING)
+        @Column(nullable = false)
+        private AccountType accountType; // DEBIT, SAVINGS, CREDIT
+
+        @Enumerated(EnumType.STRING)
+        private AccountStatus status;
+
+        @Column(nullable = false)
+        private LocalDate openedDate;
+
+        // @ManyToOne — много счетов у одного клиента
+        @ManyToOne(fetch = FetchType.LAZY)
+        @JoinColumn(name = "client_id")
+        private ClientEntity client;
+
+        // @OneToMany — у счёта много транзакций
+        @OneToMany(mappedBy = "account", cascade = CascadeType.ALL)
+        private List<TransactionEntity> transactions;
+    }
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 6: Repository — доступ к данным
+────────────────────────────────────────────────────────────────────────
+
+    // Всё что нужно — extends JpaRepository!
+    public interface AccountRepository extends JpaRepository<AccountEntity, String> {
+
+        // Spring Data сам генерирует SQL из имени метода:
+        List<AccountEntity> findByClientId(String clientId);
+        List<AccountEntity> findByStatus(AccountStatus status);
+        Optional<AccountEntity> findByIdAndStatus(String id, AccountStatus status);
+
+        // Кастомный JPQL запрос:
+        @Query("SELECT a FROM AccountEntity a WHERE a.balance > :minBalance")
+        List<AccountEntity> findAccountsWithBalanceAbove(@Param("minBalance") BigDecimal min);
+
+        // Native SQL (когда JPQL не хватает):
+        @Query(value = "SELECT * FROM accounts WHERE client_id = ?1 AND balance > 0",
+               nativeQuery = true)
+        List<AccountEntity> findActiveAccountsByClientNative(String clientId);
+
+        // Агрегация:
+        @Query("SELECT SUM(a.balance) FROM AccountEntity a WHERE a.clientId = :id")
+        BigDecimal getTotalBalanceByClientId(@Param("id") String clientId);
+    }
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 7: Валидация запросов
+────────────────────────────────────────────────────────────────────────
+
+    // DTO с валидацией:
+    public record CreateAccountRequest(
+        @NotBlank(message = "ID клиента обязателен")
+        String clientId,
+
+        @NotNull(message = "Тип счёта обязателен")
+        AccountType accountType,
+
+        @NotNull @DecimalMin(value = "0.0", message = "Баланс должен быть >= 0")
+        BigDecimal initialBalance,
+
+        @Email(message = "Некорректный email")
+        String contactEmail
+    ) {}
+
+    // Глобальный обработчик ошибок:
+    @ControllerAdvice
+    public class GlobalExceptionHandler {
+
+        @ExceptionHandler(MethodArgumentNotValidException.class)
+        public ResponseEntity<Map<String, String>> handleValidationErrors(
+                MethodArgumentNotValidException ex) {
+            Map<String, String> errors = new HashMap<>();
+            ex.getBindingResult().getFieldErrors()
+                .forEach(err -> errors.put(err.getField(), err.getDefaultMessage()));
+            return ResponseEntity.badRequest().body(errors);
+        }
+
+        @ExceptionHandler(InsufficientFundsException.class)
+        public ResponseEntity<String> handleInsufficientFunds(InsufficientFundsException e) {
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(e.getMessage());
+        }
+    }
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 8: application.properties — конфигурация
+────────────────────────────────────────────────────────────────────────
+
+    # Для разработки (H2 — база в памяти, не нужно устанавливать):
+    spring.datasource.url=jdbc:h2:mem:bankdb
+    spring.datasource.driver-class-name=org.h2.Driver
+    spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+    spring.h2.console.enabled=true          # UI по адресу /h2-console
+    spring.jpa.show-sql=true                # показывать SQL в логах
+    spring.jpa.hibernate.ddl-auto=create-drop # создать таблицы при старте
+
+    # Для production (PostgreSQL):
+    spring.datasource.url=jdbc:postgresql://localhost:5432/bank
+    spring.datasource.username=${DB_USERNAME}  # из переменных окружения!
+    spring.datasource.password=${DB_PASSWORD}
+    spring.jpa.hibernate.ddl-auto=validate  # только проверять, не создавать
+
+    # Сервер:
+    server.port=8080
+    server.servlet.context-path=/bank-api
+
+    # Логирование:
+    logging.level.com.bank=DEBUG
+    logging.level.org.hibernate.SQL=DEBUG
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 9: Задания — реализуй сам!
+────────────────────────────────────────────────────────────────────────
+
+    [ ] 1. Раскомментируй Spring Boot зависимости в pom.xml
+           Создай BankApplication.java и запусти на порту 8080
+
+    [ ] 2. Создай AccountController с эндпоинтами:
+           GET  /api/accounts
+           GET  /api/accounts/{id}
+           POST /api/accounts (create)
+
+    [ ] 3. Создай AccountEntity с @Entity, @Id, @Column
+           Создай AccountRepository extends JpaRepository
+
+    [ ] 4. Добавь валидацию:
+           - clientId обязателен (@NotBlank)
+           - balance >= 0 (@DecimalMin)
+           - Обработай ошибки через @ControllerAdvice
+
+    [ ] 5. Добавь эндпоинт POST /api/accounts/transfer
+           Сделай его @Transactional
+           Протестируй через Postman или curl:
+           curl -X POST http://localhost:8080/api/accounts/transfer \
+             -H "Content-Type: application/json" \
+             -d '{"fromId":"ACC001","toId":"ACC002","amount":1000}'

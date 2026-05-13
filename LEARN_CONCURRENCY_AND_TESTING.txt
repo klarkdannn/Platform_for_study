@@ -1,0 +1,299 @@
+================================================================================
+  МНОГОПОТОЧНОСТЬ И ТЕСТИРОВАНИЕ — ТЕОРИЯ И ШПАРГАЛКА
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 1: МНОГОПОТОЧНОСТЬ — КАК ДУМАТЬ О НЕЙ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── АНАЛОГИЯ: БАНК С КАССИРАМИ ─────────────────────────────────────────────────
+
+  Один поток  = один кассир. Клиенты в очереди. 10 000 клиентов → очередь огромна.
+  10 потоков  = 10 кассиров. Параллельная обработка. Намного быстрее!
+  Но: если два кассира одновременно снимают деньги с одного счёта — катастрофа.
+
+─── ПРОБЛЕМЫ МНОГОПОТОЧНОСТИ ────────────────────────────────────────────────────
+
+  RACE CONDITION (состояние гонки):
+    Два потока читают balance=1000, оба добавляют 100, оба пишут 1100.
+    Итог: 1100 вместо правильного 1200. ДЕНЬГИ ПОТЕРЯНЫ!
+
+    Причина: read-modify-write НЕ атомарна.
+    Решение: synchronized / AtomicInteger / Lock
+
+  DEADLOCK (взаимная блокировка):
+    Поток A держит Lock1, ждёт Lock2.
+    Поток B держит Lock2, ждёт Lock1.
+    Оба ждут вечно. Приложение зависло.
+
+    Причина: разный порядок захвата локов.
+    Решение: всегда брать локи в одном порядке / tryLock с таймаутом
+
+  VISIBILITY (проблема видимости):
+    Поток 1 меняет running = false.
+    Поток 2 не видит это изменение (CPU кеш).
+    Поток 2 продолжает работать бесконечно!
+
+    Причина: JVM оптимизации, CPU кеши.
+    Решение: volatile / synchronized
+
+  LIVELOCK:
+    Два потока постоянно реагируют друг на друга и ничего не делают.
+    Аналог: два человека в коридоре, оба шагают в одну сторону.
+
+  STARVATION (голодание):
+    Поток с низким приоритетом никогда не получает CPU время.
+    Решение: fair lock (ReentrantLock(true))
+
+─── КЛЮЧЕВЫЕ ИНСТРУМЕНТЫ ────────────────────────────────────────────────────────
+
+  ИНСТРУМЕНТ               │ КОГДА ИСПОЛЬЗОВАТЬ
+  ─────────────────────────┼────────────────────────────────────────────────────
+  synchronized             │ Простые случаи, понятно, медленнее
+  volatile                 │ Один флаг видимости (running, initialized)
+  AtomicInteger/Long       │ Счётчики, CAS операции без synchronized
+  LongAdder                │ Счётчики под высокой конкуренцией (быстрее Atomic)
+  ReentrantLock            │ Нужен tryLock, timeout, или interruptible wait
+  ReadWriteLock            │ Много читателей, мало писателей (кеш, конфиг)
+  Semaphore                │ Ограничить N одновременных (connection pool)
+  CountDownLatch           │ Ждать N событий (одноразовый)
+  CyclicBarrier            │ N потоков ждут друг друга (многоразовый)
+  BlockingQueue            │ Producer-Consumer (вместо wait/notify)
+  ConcurrentHashMap        │ Потокобезопасная карта
+  CopyOnWriteArrayList     │ Много чтений, редкие записи (listeners)
+  ThreadLocal              │ Данные уникальны для потока (RequestId, User)
+
+─── EXECUTORSERVICE VS THREAD ВРУЧНУЮ ──────────────────────────────────────────
+
+  Thread вручную → УСТАРЕЛО для production кода:
+    - Нет переиспользования потоков
+    - Нет управления ошибками
+    - Нет отмены задач
+    - Тяжело тестировать
+
+  ExecutorService → ИСПОЛЬЗУЙ ЭТО:
+    - Пул потоков (создать поток дорого: ~1MB стека)
+    - Future для получения результата
+    - Graceful shutdown
+    - CompletableFuture для async цепочек
+
+  // НИКОГДА не делай так в production:
+  new Thread(() -> processPayment(req)).start(); // Нет ограничения! 10k запросов → 10k потоков → OOM!
+
+  // ПРАВИЛЬНО:
+  ExecutorService pool = Executors.newFixedThreadPool(50); // Не более 50 одновременно
+  pool.submit(() -> processPayment(req));
+
+─── COMPLETABLEFUTURE — ШПАРГАЛКА ──────────────────────────────────────────────
+
+  supplyAsync(supplier)        → запустить задачу async
+  thenApply(fn)                → трансформировать результат (как map у Stream)
+  thenAccept(consumer)         → consume результат (нет возврата)
+  thenRun(runnable)            → выполнить без доступа к результату
+  thenCompose(fn→CF)           → flatMap (fn возвращает CF, не вложение!)
+  thenCombine(other, fn)       → объединить ДВА CF
+  allOf(cf1, cf2, ...)         → ждать ВСЕ
+  anyOf(cf1, cf2, ...)         → ждать ПЕРВОГО
+  exceptionally(fn)            → обработка ошибки (как catch)
+  handle(fn(result, ex))       → обработка И успеха И ошибки
+  whenComplete(fn(r,ex))       → side effect (лог/метрика) без изменения результата
+  join()                       → get() без checked exception (используй внутри thenApply)
+
+─── JAVA MEMORY MODEL (JMM) — ГЛАВНЫЕ ПРАВИЛА ───────────────────────────────────
+
+  happens-before гарантирует что запись ВИДНА читателю:
+    1. synchronized блоки на одном мониторе
+    2. volatile переменные
+    3. Thread.start() happens-before первой строки run()
+    4. join() возвращается после завершения потока
+    5. future.get() возвращается после завершения задачи
+
+  ПРАВИЛО: если нет happens-before → нет гарантии видимости!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 2: ТЕСТИРОВАНИЕ — КАК ДУМАТЬ О НЁМ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── ПИРАМИДА ТЕСТОВ ─────────────────────────────────────────────────────────────
+
+              /\
+             /E2E\          Мало, медленно ($$$), хрупко
+            /──────\        Тестируют пользовательские сценарии целиком
+           /Integr. \       Средне, тестируют несколько компонентов вместе
+          /───────────\     Реальная БД (TestContainers!)
+         /  Unit Tests  \   Много, быстро (мс), дёшево, изолированно
+        /────────────────\  Mockito для зависимостей
+
+  Соотношение: 70% Unit | 20% Integration | 10% E2E
+
+─── JUNIT 5 АННОТАЦИИ ШПАРГАЛКА ────────────────────────────────────────────────
+
+  @Test                    — тестовый метод
+  @BeforeAll / @AfterAll   — один раз для класса (static)
+  @BeforeEach / @AfterEach — перед/после каждого теста
+  @DisplayName             — человеческое описание
+  @Nested                  — вложенные классы для организации
+  @Disabled                — пропустить тест
+  @ParameterizedTest       — один тест, много данных
+  @CsvSource               — данные прямо в аннотации
+  @MethodSource            — данные из статического метода
+  @ValueSource             — массив простых значений
+  @EnumSource              — все или некоторые значения enum
+  @Tag                     — группировка (smoke, regression, fast)
+  @Timeout                 — максимальное время
+  @TempDir                 — временная директория для файловых тестов
+
+─── MOCKITO ШПАРГАЛКА ───────────────────────────────────────────────────────────
+
+  СОЗДАНИЕ:
+    @Mock MyRepo repo;                    // Чистый мок
+    @Spy  MyService service;              // Реальный объект + моканье методов
+    @InjectMocks MyController controller; // Создать объект + инжектировать @Mock
+
+  НАСТРОЙКА (стабы):
+    when(repo.findById("1")).thenReturn(Optional.of(account));
+    when(repo.findById(any())).thenReturn(Optional.empty()); // Для любого аргумента
+    when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0)); // Вернуть аргумент
+    when(service.call()).thenThrow(new RuntimeException("Ошибка"));
+    doReturn(value).when(spy).method(); // Для spy (избегает реального вызова)
+
+    // BDD стиль (предпочтительнее):
+    given(repo.findById("1")).willReturn(Optional.of(account));
+    given(service.call()).willThrow(new RuntimeException());
+
+  ВЕРИФИКАЦИЯ:
+    verify(repo).save(account);                    // Вызван ровно 1 раз
+    verify(repo, times(2)).save(any());            // Ровно 2 раза
+    verify(repo, never()).delete(any());           // Никогда
+    verify(repo, atLeast(1)).findById(any());      // Хотя бы 1 раз
+    verify(repo, atMost(3)).findById(any());       // Не более 3 раз
+    verifyNoInteractions(notificationService);     // Ни одного вызова
+
+    // InOrder — порядок вызовов:
+    InOrder order = inOrder(auditLog, notification);
+    order.verify(auditLog).log(any());             // Сначала лог
+    order.verify(notification).send(any());        // Потом уведомление
+
+  АРГУМЕНТЫ:
+    any()                   — любой объект (не null)
+    anyString()             — любая строка
+    eq("exact")             — точное значение (обязательно с any() в других параметрах)
+    argThat(x -> x > 0)    — кастомный matcher
+
+  ЗАХВАТ АРГУМЕНТОВ:
+    ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
+    verify(repo).save(captor.capture());
+    Account saved = captor.getValue();
+    assertEquals("ACC-001", saved.id()); // Проверяем что именно было сохранено
+
+─── ПАТТЕРН AAA (ARRANGE-ACT-ASSERT) ───────────────────────────────────────────
+
+  @Test
+  void transfer_success() {
+      // Arrange — подготовить данные
+      Account from = new Account("ACC-001", BigDecimal.valueOf(1000));
+      Account to   = new Account("ACC-002", BigDecimal.valueOf(500));
+      given(repo.findById("ACC-001")).willReturn(Optional.of(from));
+      given(repo.findById("ACC-002")).willReturn(Optional.of(to));
+
+      // Act — вызвать метод под тестом
+      TransferResult result = service.transfer("ACC-001", "ACC-002", BigDecimal.TEN);
+
+      // Assert — проверить результат
+      assertTrue(result.success());
+      verify(repo, times(2)).save(any());
+  }
+
+─── ЧТО ТЕСТИРОВАТЬ (ПРАВИЛО) ──────────────────────────────────────────────────
+
+  ТЕСТИРОВАТЬ (бизнес-логика):
+    ✓ Успешный перевод обновляет оба баланса
+    ✓ Недостаточный баланс → исключение
+    ✓ Нулевая сумма → исключение
+    ✓ Дублирующийся ключ → исключение
+    ✓ Уведомление отправляется ПОСЛЕ успешного перевода
+    ✓ Аудит логируется с правильными данными
+
+  НЕ ТЕСТИРОВАТЬ (инфраструктура):
+    ✗ Геттеры/сеттеры
+    ✗ Конструкторы
+    ✗ toString(), hashCode(), equals() (если не переопределял)
+    ✗ Чужой код (Spring, JPA, Mockito)
+
+─── ИМЕНОВАНИЕ ТЕСТОВ (ШАБЛОНЫ) ────────────────────────────────────────────────
+
+  Метод: methodName_condition_expectedBehavior
+    transfer_insufficientFunds_throwsException
+    getBalance_existingAccount_returnsBalance
+    createAccount_nullOwner_throwsIllegalArgument
+
+  Display Name: человеческий язык
+    "Перевод при недостатке средств выбрасывает InsufficientFundsException"
+    "Баланс > 0 после пополнения"
+
+─── ПОКРЫТИЕ КОДА (CODE COVERAGE) ─────────────────────────────────────────────
+
+  Метрики:
+    Line coverage   — % строк выполненных в тестах
+    Branch coverage — % ветвей if/switch
+    Method coverage — % методов вызванных в тестах
+
+  Инструменты: JaCoCo (Maven plugin), встроен в IntelliJ IDEA
+  Запуск: mvn test jacoco:report → target/site/jacoco/index.html
+
+  Цель в банке: 70-80% (выше не всегда оправдано)
+  100% coverage ≠ нет багов (можно покрыть но не проверить логику)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ФАЙЛЫ В ПРОЕКТЕ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  src/main/java/com/bank/concurrency/
+    ThreadBasics.java          — Thread, synchronized, volatile, lock, ThreadLocal
+    ExecutorServiceDemo.java   — ExecutorService, Future, CompletableFuture, Semaphore
+    ConcurrentCollections.java — ConcurrentHashMap, BlockingQueue, AtomicLong, LongAdder
+
+  src/test/java/com/bank/
+    BasicsTest.java             — JUnit 5: assertions, lifecycle, parameterized, exceptions
+    MockitoAndServiceTest.java  — Mockito: @Mock, @InjectMocks, verify, captor, spy
+    AlgorithmsTest.java         — Тесты алгоритмов: sorting, search, fibonacci, stack
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ВОПРОСЫ НА СОБЕСЕДОВАНИИ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Q: Чем synchronized отличается от volatile?
+  A: synchronized — гарантирует атомарность И видимость, блокирует поток.
+     volatile — только видимость, не атомарность. Нельзя использовать для i++.
+
+  Q: Что такое happens-before?
+  A: Гарантия что запись одного потока видна другому.
+     Без happens-before JVM может переупорядочить операции.
+     synchronized, volatile, Thread.start/join, future.get — создают happens-before.
+
+  Q: Чем отличается Callable от Runnable?
+  A: Runnable.run() — void, не может бросить checked exception.
+     Callable.call() — возвращает значение, может бросить Exception.
+
+  Q: Что такое thread pool и зачем он нужен?
+  A: Набор заранее созданных потоков. Создание потока дорого (~1MB стека, ~1ms).
+     Pool переиспользует потоки. Ограничивает их количество (нет OOM).
+
+  Q: В чём разница между Future и CompletableFuture?
+  A: Future — примитивный: только get() (блокирующий). Нельзя цеплять операции.
+     CompletableFuture — thenApply/thenCompose/allOf/anyOf. Async цепочки.
+     CompletableFuture можно завершить вручную (complete/completeExceptionally).
+
+  Q: Что такое мок и зачем он нужен?
+  A: Фиктивный объект, имитирующий реальную зависимость.
+     Нужен чтобы изолировать тестируемый класс: не ходить в БД, не отправлять SMS.
+     Делает тесты быстрыми (мс вместо сек) и независимыми от инфраструктуры.
+
+  Q: Когда использовать @Mock vs @Spy?
+  A: @Mock — полностью фиктивный объект, все методы по умолчанию ничего не делают.
+     @Spy — реальный объект, но можно замокировать конкретные методы.
+     Используй @Spy когда хочешь проверить реальную логику + заменить одну часть.
+
+  Q: Что тестирует unit тест vs integration тест?
+  A: Unit — один класс в изоляции, зависимости замоканы. Быстро (<1ms).
+     Integration — несколько компонентов, может быть реальная БД. Медленнее.

@@ -1,0 +1,337 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║          ФРЕЙМВОРКИ — SPRING BOOT И ВСЁ ЧТО ВОКРУГ                              ║
+║          Полный гид по экосистеме Java backend                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЗАЧЕМ НУЖНЫ ФРЕЙМВОРКИ?
+═══════════════════════════════════════════════════════════════════════════════════
+Без фреймворка тебе нужно:
+  - Написать HTTP сервер с нуля
+  - Разобрать JSON вручную
+  - Написать connection pool для БД
+  - Настроить DI (Dependency Injection) самому
+  - Написать систему логирования
+  - ...это месяцы работы
+
+С Spring Boot:
+  @RestController
+  @GetMapping("/accounts/{id}")
+  public Account getAccount(@PathVariable String id) {
+      return accountService.findById(id);
+  }
+  Это готовый HTTP эндпоинт. 3 строки вместо 300.
+
+═══════════════════════════════════════════════════════════════════════════════════
+  SPRING FRAMEWORK — ОСНОВА ОСНОВ
+═══════════════════════════════════════════════════════════════════════════════════
+
+IoC (Inversion of Control) — инверсия управления:
+  Раньше: ты создаёшь объект:   AccountService service = new AccountService();
+  Spring: Spring создаёт за тебя и "внедряет" куда нужно.
+
+DI (Dependency Injection) — внедрение зависимостей:
+  Spring знает о зависимостях твоих классов и подставляет нужные реализации.
+
+ApplicationContext — контейнер Spring:
+  Хранит все Bean объекты. Управляет их жизненным циклом.
+  Bean = объект управляемый Spring.
+
+АННОТАЦИИ:
+  @Component    — "это Bean, добавь в контейнер"
+  @Service      — сервисный слой (логика)
+  @Repository   — слой данных (БД)
+  @Controller   — веб слой (HTTP)
+  @Bean         — метод создаёт Bean
+  @Configuration — класс конфигурации
+
+ВНЕДРЕНИЕ ЗАВИСИМОСТЕЙ (3 способа):
+  // 1. Через конструктор (ЛУЧШИЙ — явно, тестируемо)
+  @Service
+  public class PaymentService {
+      private final AccountRepository accountRepo;
+
+      public PaymentService(AccountRepository accountRepo) { // Spring внедрит автоматически
+          this.accountRepo = accountRepo;
+      }
+  }
+
+  // 2. Через поле (НЕ РЕКОМЕНДУЕТСЯ — скрытые зависимости, проблемы с тестами)
+  @Autowired
+  private AccountRepository accountRepo;
+
+  // 3. Через сеттер (редко используется)
+  @Autowired
+  public void setAccountRepo(AccountRepository accountRepo) {...}
+
+═══════════════════════════════════════════════════════════════════════════════════
+  SPRING BOOT — АВТОКОНФИГУРАЦИЯ
+═══════════════════════════════════════════════════════════════════════════════════
+Spring Boot = Spring + автоконфигурация + встроенный Tomcat.
+
+"Convention over Configuration" — соглашения вместо настройки.
+Добавил зависимость в pom.xml — Spring Boot сам всё настроил.
+
+application.properties (или application.yml):
+  server.port=8080
+  spring.datasource.url=jdbc:postgresql://localhost:5432/bankdb
+  spring.datasource.username=postgres
+  spring.datasource.password=${DB_PASSWORD}   # из переменной окружения
+  spring.jpa.hibernate.ddl-auto=validate       # не создавай/удаляй таблицы сам!
+
+Профили (profiles):
+  application-dev.properties    ← локальная разработка (H2 in-memory)
+  application-prod.properties   ← production (PostgreSQL, SSL)
+  Активация: spring.profiles.active=prod
+
+Actuator (мониторинг):
+  /actuator/health    ← жив ли сервис?
+  /actuator/metrics   ← метрики (JVM, HTTP, custom)
+  /actuator/info      ← версия приложения
+  В продакшне — закрой эндпоинты! management.endpoints.web.exposure.include=health
+
+═══════════════════════════════════════════════════════════════════════════════════
+  SPRING MVC / REST — HTTP СЛОЙ
+═══════════════════════════════════════════════════════════════════════════════════
+
+@RestController = @Controller + @ResponseBody (автоматически сериализует в JSON)
+
+Основные аннотации:
+  @GetMapping("/path")              ← GET запрос
+  @PostMapping("/path")             ← POST запрос
+  @PutMapping("/path/{id}")         ← PUT запрос
+  @DeleteMapping("/path/{id}")      ← DELETE запрос
+  @PatchMapping("/path/{id}")       ← PATCH запрос
+
+Параметры:
+  @PathVariable String id           ← /accounts/123 → id="123"
+  @RequestParam int page            ← /accounts?page=2 → page=2
+  @RequestBody CreateAccountRequest ← тело запроса (JSON)
+  @RequestHeader("X-API-Key")       ← заголовок запроса
+
+ResponseEntity — полный контроль ответа:
+  return ResponseEntity.ok(account);                    // 200 + тело
+  return ResponseEntity.created(uri).body(account);    // 201 + Location
+  return ResponseEntity.notFound().build();             // 404
+  return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error); // 403
+
+Глобальная обработка ошибок:
+  @RestControllerAdvice
+  public class GlobalExceptionHandler {
+
+      @ExceptionHandler(AccountNotFoundException.class)
+      @ResponseStatus(HttpStatus.NOT_FOUND)
+      public ErrorResponse handleNotFound(AccountNotFoundException ex) {
+          return new ErrorResponse("NOT_FOUND", ex.getMessage());
+      }
+
+      @ExceptionHandler(InsufficientFundsException.class)
+      @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+      public ErrorResponse handleInsufficientFunds(InsufficientFundsException ex) {
+          return new ErrorResponse("INSUFFICIENT_FUNDS", ex.getMessage());
+      }
+  }
+
+Валидация (@Valid + Bean Validation):
+  record CreateAccountRequest(
+      @NotBlank String ownerId,
+      @NotNull @Positive BigDecimal initialBalance,
+      @NotNull Currency currency
+  ) {}
+
+  @PostMapping("/accounts")
+  public ResponseEntity<Account> create(@Valid @RequestBody CreateAccountRequest req) {...}
+  // Spring автоматически вернёт 400 если @Valid не прошёл
+
+═══════════════════════════════════════════════════════════════════════════════════
+  SPRING DATA JPA — РАБОТА С БД
+═══════════════════════════════════════════════════════════════════════════════════
+JPA = Java Persistence API. Hibernate — его реализация.
+
+Entity (сущность = таблица в БД):
+  @Entity
+  @Table(name = "accounts")
+  public class AccountEntity {
+      @Id
+      @GeneratedValue(strategy = GenerationType.UUID)
+      private String id;
+
+      @Column(nullable = false)
+      private BigDecimal balance;
+
+      @Enumerated(EnumType.STRING)
+      private AccountStatus status;
+
+      @ManyToOne(fetch = FetchType.LAZY)
+      @JoinColumn(name = "client_id")
+      private ClientEntity client;
+
+      @OneToMany(mappedBy = "account", cascade = CascadeType.ALL)
+      private List<TransactionEntity> transactions;
+  }
+
+Repository (доступ к данным):
+  interface AccountRepository extends JpaRepository<AccountEntity, String> {
+      // Spring Data генерирует SQL автоматически по имени метода!
+      List<AccountEntity> findByClientId(String clientId);
+      Optional<AccountEntity> findByIdAndStatus(String id, AccountStatus status);
+      List<AccountEntity> findByBalanceGreaterThan(BigDecimal amount);
+
+      // Кастомный JPQL запрос:
+      @Query("SELECT a FROM AccountEntity a WHERE a.balance BETWEEN :min AND :max")
+      List<AccountEntity> findByBalanceRange(@Param("min") BigDecimal min,
+                                              @Param("max") BigDecimal max);
+
+      // Нативный SQL:
+      @Query(value = "SELECT * FROM accounts WHERE created_at > NOW() - INTERVAL '30 days'",
+             nativeQuery = true)
+      List<AccountEntity> findRecentAccounts();
+  }
+
+@Transactional — транзакции:
+  @Service
+  public class TransferService {
+
+      @Transactional  // если метод упадёт — откатятся ОБА изменения!
+      public void transfer(String fromId, String toId, BigDecimal amount) {
+          AccountEntity from = accountRepo.findById(fromId).orElseThrow();
+          AccountEntity to = accountRepo.findById(toId).orElseThrow();
+
+          from.setBalance(from.getBalance().subtract(amount));
+          to.setBalance(to.getBalance().add(amount));
+          // Обе записи сохранятся АТОМАРНО. Либо оба, либо никто.
+      }
+  }
+
+Важные правила:
+  - fetch = FetchType.LAZY везде (иначе N+1 проблема!)
+  - Никогда не возвращай Entity из контроллера (используй DTO)
+  - @Transactional только в Service, не в Controller
+  - Для mass updates — используй @Modifying + @Query (не загружай в память!)
+
+N+1 проблема:
+  Загрузил 100 клиентов → для каждого загружает счета = 101 запрос!
+  Решение: @EntityGraph или JOIN FETCH в @Query.
+
+═══════════════════════════════════════════════════════════════════════════════════
+  SPRING SECURITY
+═══════════════════════════════════════════════════════════════════════════════════
+
+  @Configuration
+  @EnableWebSecurity
+  public class SecurityConfig {
+
+      @Bean
+      public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+          return http
+              .csrf(csrf -> csrf.disable())       // для REST API с JWT
+              .sessionManagement(s -> s.sessionCreationPolicy(STATELESS))
+              .authorizeHttpRequests(auth -> auth
+                  .requestMatchers("/auth/**").permitAll()        // открытые эндпоинты
+                  .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                  .anyRequest().authenticated()
+              )
+              .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+              .build();
+      }
+
+      @Bean
+      public PasswordEncoder passwordEncoder() {
+          return new BCryptPasswordEncoder(12); // cost factor 12
+      }
+  }
+
+  // JWT фильтр — проверяем токен в каждом запросе
+  @Component
+  public class JwtFilter extends OncePerRequestFilter {
+      @Override
+      protected void doFilterInternal(HttpServletRequest req, ...) {
+          String token = extractToken(req);
+          if (token != null && jwtService.isValid(token)) {
+              String userId = jwtService.extractUserId(token);
+              // устанавливаем аутентификацию в контекст
+              SecurityContextHolder.getContext().setAuthentication(...);
+          }
+          filterChain.doFilter(req, res);
+      }
+  }
+
+  // Контроль доступа на уровне методов:
+  @PreAuthorize("hasRole('ADMIN') or #clientId == authentication.name")
+  public List<Account> getClientAccounts(String clientId) { ... }
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ДРУГИЕ КЛЮЧЕВЫЕ ФРЕЙМВОРКИ И БИБЛИОТЕКИ
+═══════════════════════════════════════════════════════════════════════════════════
+
+БАЗЫ ДАННЫХ:
+  PostgreSQL     — основная реляционная БД в банке
+  Redis          — кэш, сессии, OTP коды, rate limiting
+  MongoDB        — документы (логи, конфиги, гибкая структура)
+  Cassandra      — очень большой объём записей (транзакционные логи)
+  Liquibase/Flyway — миграции БД (версионирование схемы)
+
+ТЕСТИРОВАНИЕ:
+  JUnit 5        — тесты
+  Mockito        — мокирование зависимостей
+  Testcontainers — реальная PostgreSQL в Docker для тестов (НЕ H2!)
+  AssertJ        — красивые assert'ы: assertThat(balance).isGreaterThan(ZERO)
+  WireMock       — мок для HTTP зависимостей
+
+КАЧЕСТВО КОДА:
+  Lombok         — @Data, @Builder, @Slf4j — меньше бойлерплейта
+  MapStruct      — маппинг Entity ↔ DTO (не делай вручную!)
+  Swagger/OpenAPI — автодокументация API (SpringDoc)
+
+ОЧЕРЕДИ И СТРИМИНГ:
+  Spring Kafka   — @KafkaListener("payments") — слушаем события
+  Spring AMQP    — RabbitMQ интеграция
+
+РЕЗИЛЕНТНОСТЬ:
+  Resilience4j   — CircuitBreaker, RateLimiter, Retry, Bulkhead
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ТИПИЧНАЯ СТРУКТУРА SPRING BOOT ПРОЕКТА
+═══════════════════════════════════════════════════════════════════════════════════
+
+src/main/java/com/bank/
+├── BankApplication.java              ← @SpringBootApplication
+├── config/
+│   ├── SecurityConfig.java           ← Spring Security
+│   ├── SwaggerConfig.java            ← API документация
+│   └── KafkaConfig.java              ← настройка Kafka
+├── controller/
+│   ├── AccountController.java        ← @RestController
+│   └── TransactionController.java
+├── service/
+│   ├── AccountService.java           ← @Service, бизнес-логика
+│   └── TransferService.java          ← @Transactional
+├── repository/
+│   └── AccountRepository.java        ← extends JpaRepository
+├── entity/
+│   ├── AccountEntity.java            ← @Entity
+│   └── ClientEntity.java
+├── dto/
+│   ├── request/
+│   │   ├── CreateAccountRequest.java ← входящие данные
+│   │   └── TransferRequest.java
+│   └── response/
+│       └── AccountResponse.java      ← исходящие данные
+├── mapper/
+│   └── AccountMapper.java            ← Entity ↔ DTO (MapStruct)
+├── exception/
+│   ├── BankException.java
+│   └── GlobalExceptionHandler.java   ← @RestControllerAdvice
+└── security/
+    ├── JwtService.java
+    └── JwtFilter.java
+
+═══════════════════════════════════════════════════════════════════════════════════
+  РЕСУРСЫ
+═══════════════════════════════════════════════════════════════════════════════════
+  spring.io/guides — официальные туториалы Spring (отличные!)
+  Baeldung.com — лучший ресурс по Spring на английском
+  YouTube Amigoscode — "Spring Boot 3 Full Course" (6 часов, очень хорошо)
+  YouTube Telusko — Spring Boot + Hibernate
+  YouTube "Dan Vega" — современный Spring (Spring 6, Virtual Threads)
+  Книга "Spring in Action" — Craig Walls (главная книга по Spring)

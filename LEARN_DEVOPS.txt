@@ -1,0 +1,1481 @@
+================================================================================
+  DEVOPS ДЛЯ BACKEND JAVA РАЗРАБОТЧИКА — ПОЛНОЕ РУКОВОДСТВО
+================================================================================
+
+"DevOps — это культура, практики и инструменты, которые ускоряют доставку ПО
+ и повышают его надёжность. Разработчик, понимающий DevOps, стоит в 2x дороже."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 1: LINUX — ФУНДАМЕНТ DEVOPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+99% серверов работают на Linux. Знание команд — обязательно.
+
+─── 1.1 ФАЙЛОВАЯ СИСТЕМА ───────────────────────────────────────────────────────
+
+/                   # Корень
+├── /etc            # Конфиги системы (nginx, ssh, cron)
+├── /var/log        # Логи (app.log, syslog, auth.log)
+├── /opt            # Сторонние приложения
+├── /home/user      # Домашняя директория пользователя
+├── /usr/local/bin  # Бинарники, установленные вручную
+├── /tmp            # Временные файлы (очищаются при перезагрузке)
+└── /proc           # Псевдо-ФС: состояние ядра (/proc/cpuinfo, /proc/meminfo)
+
+─── 1.2 ESSENTIAL КОМАНДЫ ──────────────────────────────────────────────────────
+
+НАВИГАЦИЯ:
+  ls -la                      # Все файлы включая скрытые, с правами
+  pwd                         # Текущая директория
+  cd /opt/app && ls           # Перейти и посмотреть
+  find /var/log -name "*.log" -mtime -7   # Логи за 7 дней
+  locate app.jar              # Быстрый поиск (updatedb нужен)
+
+РАБОТА С ФАЙЛАМИ:
+  cat /etc/hosts              # Показать файл
+  tail -f /var/log/app.log    # Следить за логом в реальном времени
+  tail -n 100 app.log         # Последние 100 строк
+  grep -r "ERROR" /var/log/   # Рекурсивный поиск ошибок
+  grep -E "ERROR|WARN" app.log | tail -50   # Фильтр + последние 50
+  less app.log                # Пагинация (q — выход, /text — поиск)
+  wc -l app.log               # Количество строк
+  head -20 app.log            # Первые 20 строк
+
+ПРОЦЕССЫ:
+  ps aux                      # Все процессы
+  ps aux | grep java          # Найти Java процессы
+  top                         # Мониторинг в реальном времени
+  htop                        # Удобный top (нужно установить)
+  kill -9 1234                # Убить процесс по PID (SIGKILL)
+  kill -15 1234               # Мягкое завершение (SIGTERM)
+  pkill -f "bank-app.jar"     # Убить по имени
+  nohup java -jar app.jar &   # Запустить в фоне (не умрёт при logout)
+  lsof -i :8080               # Кто слушает порт 8080
+
+СЕТЬ:
+  netstat -tulpn              # Открытые порты
+  ss -tulpn                   # Современная замена netstat
+  curl -v http://localhost:8080/health   # HTTP запрос
+  wget http://example.com/file.zip       # Скачать файл
+  ping -c 4 google.com        # Проверить доступность
+  traceroute google.com       # Трассировка маршрута
+  nslookup bank.ru            # DNS lookup
+  dig bank.ru A               # Детальный DNS запрос
+  tcpdump -i eth0 port 5432   # Дамп трафика на порту PostgreSQL
+
+ДИСК:
+  df -h                       # Свободное место на разделах
+  du -sh /opt/app/*           # Размер папок
+  du -sh * | sort -rh | head  # Топ-10 самых больших
+
+ПРАВА ДОСТУПА:
+  chmod 755 script.sh         # rwx r-x r-x
+  chmod +x deploy.sh          # Добавить executable
+  chown app:app /opt/app      # Сменить владельца
+  sudo su - app               # Переключиться на пользователя app
+
+ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ:
+  export JAVA_OPTS="-Xmx2g"   # Установить переменную
+  echo $JAVA_OPTS             # Прочитать
+  env | grep JAVA             # Все Java переменные
+  source /etc/environment     # Перечитать системные переменные
+
+─── 1.3 SYSTEMD (УПРАВЛЕНИЕ СЕРВИСАМИ) ─────────────────────────────────────────
+
+# /etc/systemd/system/bank-app.service
+[Unit]
+Description=Bank Application
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=appuser
+WorkingDirectory=/opt/bank-app
+ExecStart=/usr/bin/java -jar -Xmx2g bank-app.jar
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=/opt/bank-app/.env
+
+[Install]
+WantedBy=multi-user.target
+
+# Управление:
+systemctl start bank-app       # Запустить
+systemctl stop bank-app        # Остановить
+systemctl restart bank-app     # Перезапустить
+systemctl status bank-app      # Статус + последние логи
+systemctl enable bank-app      # Автозапуск при старте системы
+journalctl -u bank-app -f      # Следить за логами сервиса
+journalctl -u bank-app --since "1 hour ago"   # Логи за час
+
+─── 1.4 ПОЛЕЗНЫЕ ТРЮКИ ─────────────────────────────────────────────────────────
+
+# Найти что занимает место:
+du -sh /var/log/* | sort -rh | head -10
+
+# Посмотреть сколько памяти использует Java:
+ps aux --sort=-%mem | grep java
+
+# Проверить что процесс упал и когда:
+journalctl -u bank-app --no-pager | grep -E "start|stop|fail"
+
+# Скопировать файл с удалённого сервера:
+scp user@192.168.1.10:/opt/app/app.log ./
+
+# SSH с ключом:
+ssh -i ~/.ssh/id_rsa user@prod-server
+
+# Tail нескольких файлов:
+tail -f /var/log/app.log /var/log/nginx/access.log
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 2: DOCKER — КОНТЕЙНЕРИЗАЦИЯ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Docker решает проблему "у меня работает, а у тебя нет". Контейнер — это
+изолированный процесс со своей файловой системой, сетью и переменными.
+
+─── 2.1 КЛЮЧЕВЫЕ КОНЦЕПЦИИ ─────────────────────────────────────────────────────
+
+Image (образ) — "рецепт". Неизменяемый шаблон. Слои кешируются.
+Container (контейнер) — запущенный образ. Один образ → много контейнеров.
+Registry — хранилище образов (Docker Hub, AWS ECR, GitLab Registry).
+Volume — постоянное хранилище данных (вне контейнера).
+Network — виртуальная сеть между контейнерами.
+
+─── 2.2 DOCKERFILE — НАПИСАНИЕ ОБРАЗОВ ─────────────────────────────────────────
+
+# ========== ПЛОХОЙ Dockerfile (не делай так) ==========
+FROM ubuntu:latest
+RUN apt-get install -y java-17
+COPY . /app
+CMD ["java", "-jar", "/app/app.jar"]
+# Проблемы: огромный образ (~800MB), нет оптимизации слоёв
+
+# ========== ХОРОШИЙ Dockerfile (multi-stage build) ==========
+# Стадия 1: Build — компилируем приложение
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /build
+
+# Копируем ТОЛЬКО pom.xml сначала — кешируем зависимости
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+
+# Теперь копируем код и собираем
+COPY src ./src
+RUN mvn package -DskipTests -q
+
+# ─────────────────────────────────────────────────────
+# Стадия 2: Run — только JRE, никакого Maven/JDK
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Создаём непривилегированного пользователя (БЕЗОПАСНОСТЬ!)
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+# Копируем jar из builder
+COPY --from=builder /build/target/bank-app.jar app.jar
+
+# Метаданные
+LABEL maintainer="dev@bank.ru"
+LABEL version="1.0"
+
+# Порт (документация, не открывает фактически)
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+
+# Точка входа с настройками JVM
+ENTRYPOINT ["java", \
+  "-Xmx512m", \
+  "-Xms256m", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", "app.jar"]
+
+# Результат: образ ~180MB вместо 800MB
+
+─── 2.3 СЛОИ (LAYERS) — ОПТИМИЗАЦИЯ КЕША ──────────────────────────────────────
+
+Каждая инструкция RUN/COPY/ADD создаёт СЛОЙ.
+Docker кеширует слои — если слой не изменился, он не пересобирается.
+
+ПРАВИЛО: Инструкции которые меняются РЕДКО — вверх.
+         Инструкции которые меняются ЧАСТО — вниз.
+
+# Неоптимально (код меняется часто, зависимости — редко):
+COPY . .              # Меняется при любом изменении кода!
+RUN mvn install       # Пересобирается каждый раз
+
+# Оптимально:
+COPY pom.xml .        # Меняется только при добавлении зависимостей
+RUN mvn dependency:go-offline   # Кешируется!
+COPY src ./src        # Меняется часто, но зависимости уже скачаны
+
+─── 2.4 ОСНОВНЫЕ КОМАНДЫ ───────────────────────────────────────────────────────
+
+ОБРАЗЫ:
+  docker build -t bank-app:1.0 .          # Собрать образ
+  docker build -t bank-app:latest --no-cache .   # Без кеша
+  docker images                           # Список образов
+  docker pull eclipse-temurin:21-jre      # Скачать образ
+  docker push registry.bank.ru/bank-app:1.0  # Отправить в registry
+  docker rmi bank-app:old                 # Удалить образ
+  docker image prune                      # Удалить неиспользуемые
+
+КОНТЕЙНЕРЫ:
+  docker run -d \
+    --name bank-app \
+    -p 8080:8080 \
+    -e SPRING_PROFILES_ACTIVE=prod \
+    -e DB_PASSWORD=secret \
+    -v /opt/logs:/app/logs \
+    bank-app:latest
+
+  -d           # Detached (фоновый режим)
+  --name       # Имя контейнера
+  -p 8080:8080 # host_port:container_port
+  -e           # Переменная окружения
+  -v           # Volume: host_path:container_path
+  --restart=always  # Перезапускать при падении
+
+  docker ps                        # Запущенные контейнеры
+  docker ps -a                     # Все включая остановленные
+  docker logs bank-app -f          # Логи в реальном времени
+  docker logs bank-app --tail=100  # Последние 100 строк
+  docker exec -it bank-app sh      # Войти в контейнер (интерактивно)
+  docker stop bank-app             # Остановить (SIGTERM)
+  docker kill bank-app             # Убить (SIGKILL)
+  docker rm bank-app               # Удалить контейнер
+  docker inspect bank-app          # Подробная информация (JSON)
+  docker stats                     # CPU/Memory всех контейнеров
+
+─── 2.5 DOCKER COMPOSE ─────────────────────────────────────────────────────────
+
+Docker Compose — инструмент для запуска нескольких контейнеров вместе.
+
+# docker-compose.yml
+version: '3.9'
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: bank-postgres
+    environment:
+      POSTGRES_DB: bankdb
+      POSTGRES_USER: bankuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD}   # из .env файла
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bankuser -d bankdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: bank-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 256mb
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  # Spring Boot App
+  bank-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bank-app
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bankdb
+      SPRING_DATASOURCE_USERNAME: bankuser
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: bank-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - bank-app
+
+# Именованные volumes (данные сохраняются между перезапусками)
+volumes:
+  postgres_data:
+    driver: local
+
+# Отдельные сети (изоляция)
+networks:
+  default:
+    driver: bridge
+
+# .env файл (НЕ коммитить в git!)
+# DB_PASSWORD=super_secret_password
+# REDIS_PASSWORD=redis_secret
+
+─── КОМАНДЫ COMPOSE ────────────────────────────────────────────────────────────
+
+  docker-compose up -d              # Запустить всё в фоне
+  docker-compose up -d bank-app     # Только один сервис
+  docker-compose down               # Остановить и удалить контейнеры
+  docker-compose down -v            # + удалить volumes (ОСТОРОЖНО!)
+  docker-compose logs -f bank-app   # Логи сервиса
+  docker-compose ps                 # Статус всех сервисов
+  docker-compose restart bank-app   # Перезапустить сервис
+  docker-compose exec bank-app sh   # Войти в контейнер
+  docker-compose build --no-cache   # Пересобрать образы
+  docker-compose pull               # Обновить образы
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 3: CI/CD — НЕПРЕРЫВНАЯ ИНТЕГРАЦИЯ И ДОСТАВКА
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CI (Continuous Integration) — автоматически собираем и тестируем при каждом push.
+CD (Continuous Delivery) — автоматически доставляем в staging, вручную в prod.
+CD (Continuous Deployment) — автоматически в prod (только зрелые команды).
+
+─── 3.1 PIPELINE КОНЦЕПЦИЯ ─────────────────────────────────────────────────────
+
+Типичный pipeline банка:
+
+  Developer Push
+       │
+       ▼
+  ┌─────────────┐
+  │   CI Server  │  (GitHub Actions / GitLab CI / Jenkins)
+  └─────────────┘
+       │
+       ├── 1. Checkout code
+       ├── 2. Compile (mvn compile)
+       ├── 3. Unit tests (mvn test)
+       ├── 4. Integration tests
+       ├── 5. Code quality (SonarQube)
+       ├── 6. Security scan (OWASP, Trivy)
+       ├── 7. Build Docker image
+       ├── 8. Push to registry
+       ├── 9. Deploy to DEV
+       ├── 10. Smoke tests on DEV
+       └── 11. Notify team (Slack/Telegram)
+           │
+           ├── [manual approval] → Deploy to STAGING
+           │   └── [QA tests pass] → [manual approval] → Deploy to PROD
+           └── [auto] → Deploy to PROD (Continuous Deployment)
+
+─── 3.2 GITHUB ACTIONS ─────────────────────────────────────────────────────────
+
+# .github/workflows/ci-cd.yml
+
+name: Bank App CI/CD
+
+# Триггеры
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# Переменные окружения
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  JAVA_VERSION: '21'
+
+jobs:
+  # ─── JOB 1: Build & Test ───────────────────────────────────────────────────
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # Сервисы (аналог docker-compose для тестов)
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'   # Кешируем ~/.m2 между запусками
+
+      - name: Build with Maven
+        run: mvn clean compile -q
+
+      - name: Run Unit Tests
+        run: mvn test -q
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: test
+          SPRING_DATASOURCE_PASSWORD: test
+
+      - name: Run Integration Tests
+        run: mvn verify -P integration-tests -q
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()   # Даже если тесты упали
+        with:
+          name: test-results
+          path: target/surefire-reports/
+
+      - name: Code Coverage (JaCoCo)
+        run: mvn jacoco:report
+
+      - name: Check Coverage Threshold
+        run: |
+          COVERAGE=$(grep -oP 'INSTRUCTION.*?missed.*?covered' target/site/jacoco/index.html | ...)
+          if [ "$COVERAGE" -lt "80" ]; then
+            echo "Coverage below 80%!"
+            exit 1
+          fi
+
+  # ─── JOB 2: Code Quality ───────────────────────────────────────────────────
+  code-quality:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # SonarQube нужна вся история
+
+      - name: SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: mvn sonar:sonar -Dsonar.projectKey=bank-app
+
+  # ─── JOB 3: Security Scan ──────────────────────────────────────────────────
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'bank-app'
+          path: '.'
+          format: 'HTML'
+
+      - name: Run Trivy (Container scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'   # Упасть при критических уязвимостях
+
+  # ─── JOB 4: Build & Push Docker Image ─────────────────────────────────────
+  docker-build-push:
+    runs-on: ubuntu-latest
+    needs: [code-quality, security-scan]
+    if: github.ref == 'refs/heads/main'   # Только для main
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha    # GitHub Actions cache для Docker
+          cache-to: type=gha,mode=max
+
+  # ─── JOB 5: Deploy to DEV ──────────────────────────────────────────────────
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: docker-build-push
+    environment: development    # GitHub Environment (можно настроить protection rules)
+
+    steps:
+      - name: Deploy to DEV server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEV_HOST }}
+          username: ${{ secrets.DEV_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script: |
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            docker-compose -f /opt/bank-app/docker-compose.yml up -d bank-app
+            docker image prune -f
+
+  # ─── JOB 6: Deploy to PROD (Manual Approval) ──────────────────────────────
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment:
+      name: production
+      url: https://bank.ru
+    # В GitHub нужно настроить "Required reviewers" для environment "production"
+
+    steps:
+      - name: Deploy to PROD
+        run: |
+          echo "Deploying to production..."
+          # kubectl set image deployment/bank-app bank-app=$IMAGE:$TAG
+
+─── 3.3 GITLAB CI ──────────────────────────────────────────────────────────────
+
+# .gitlab-ci.yml
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+
+# Кеш Maven зависимостей
+cache:
+  key: "${CI_JOB_NAME}"
+  paths:
+    - .m2/repository/
+
+stages:
+  - build
+  - test
+  - security
+  - docker
+  - deploy-dev
+  - deploy-staging
+  - deploy-prod
+
+build:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  script:
+    - mvn clean compile -q
+  artifacts:
+    paths:
+      - target/
+
+unit-tests:
+  stage: test
+  image: maven:3.9-eclipse-temurin-21
+  services:
+    - postgres:15
+  variables:
+    POSTGRES_DB: testdb
+    POSTGRES_USER: test
+    POSTGRES_PASSWORD: test
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres/testdb
+  script:
+    - mvn test
+  coverage: '/Total.*?([0-9]{1,3})%/'   # Парсим % покрытия
+  artifacts:
+    reports:
+      junit: target/surefire-reports/*.xml
+      coverage_report:
+        coverage_format: jacoco
+        path: target/site/jacoco/jacoco.xml
+
+docker-build:
+  stage: docker
+  image: docker:24
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $DOCKER_IMAGE .
+    - docker push $DOCKER_IMAGE
+    - docker tag $DOCKER_IMAGE $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - main
+
+deploy-prod:
+  stage: deploy-prod
+  script:
+    - echo "Deploying $DOCKER_IMAGE to production"
+  when: manual          # Требует ручного запуска
+  only:
+    - main
+  environment:
+    name: production
+    url: https://bank.ru
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 4: KUBERNETES — ОРКЕСТРАЦИЯ КОНТЕЙНЕРОВ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Kubernetes (K8s) — система оркестрации. Управляет контейнерами в кластере серверов.
+Docker — один сервер. Kubernetes — кластер из N серверов.
+
+─── 4.1 АРХИТЕКТУРА КЛАСТЕРА ───────────────────────────────────────────────────
+
+CONTROL PLANE (мастер-узлы):
+  kube-apiserver   — REST API Kubernetes (точка входа для kubectl)
+  etcd             — Распределённое key-value хранилище (состояние кластера)
+  kube-scheduler   — Решает на каком Node запустить Pod
+  controller-manager — Следит за desired state (ReplicaSet controller и др.)
+
+WORKER NODES (рабочие узлы):
+  kubelet          — Агент на каждой ноде, общается с API server
+  kube-proxy       — Сетевые правила, балансировка на ноде
+  container runtime — containerd (ранее Docker)
+
+─── 4.2 ОСНОВНЫЕ ОБЪЕКТЫ ───────────────────────────────────────────────────────
+
+POD — минимальная единица. 1+ контейнеров с общей сетью и хранилищем.
+      Поды временные — умирают и создаются заново.
+
+DEPLOYMENT — управляет ReplicaSet. Обеспечивает N копий Пода.
+             Rolling updates, rollback. Это то что ты используешь для приложений.
+
+SERVICE — стабильный DNS и IP для группы Подов. Типы:
+  ClusterIP   — только внутри кластера (по умолчанию)
+  NodePort    — открывает порт на каждой ноде (для тестов)
+  LoadBalancer — создаёт LB в облаке (AWS ELB, GCP LB)
+
+INGRESS — HTTP/HTTPS маршрутизация. Один балансировщик → много сервисов.
+
+CONFIGMAP — конфигурация (не секреты). Монтируется как файл или env vars.
+SECRET — секреты (пароли, токены). Хранится в base64 (не шифрование!).
+
+PersistentVolume (PV) — физическое хранилище (AWS EBS, GCP PD, NFS).
+PersistentVolumeClaim (PVC) — запрос на хранилище от приложения.
+
+─── 4.3 МАНИФЕСТЫ KUBERNETES ───────────────────────────────────────────────────
+
+# namespace.yaml — изолированное пространство имён
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking
+
+---
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bank-config
+  namespace: banking
+data:
+  SPRING_PROFILES_ACTIVE: "production"
+  SERVER_PORT: "8080"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "bankdb"
+
+---
+# secret.yaml (значения — base64: echo -n "password" | base64)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bank-secrets
+  namespace: banking
+type: Opaque
+data:
+  DB_PASSWORD: c3VwZXJfc2VjcmV0   # base64("super_secret")
+  JWT_SECRET: bXlfc2VjcmV0X2tleQ==
+  REDIS_PASSWORD: cmVkaXNfcGFzcw==
+
+---
+# deployment.yaml — главный файл приложения
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-app
+  namespace: banking
+  labels:
+    app: bank-app
+    version: "1.0"
+spec:
+  replicas: 3               # 3 экземпляра приложения
+  selector:
+    matchLabels:
+      app: bank-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1           # Максимум +1 Pod сверх replicas при обновлении
+      maxUnavailable: 0     # Нельзя удалять Поды до появления новых (zero downtime)
+  template:
+    metadata:
+      labels:
+        app: bank-app
+    spec:
+      containers:
+        - name: bank-app
+          image: registry.bank.ru/bank-app:1.2.3
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+
+          # Переменные из ConfigMap и Secret
+          envFrom:
+            - configMapRef:
+                name: bank-config
+            - secretRef:
+                name: bank-secrets
+
+          # Или по отдельности:
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name   # Имя Пода (для логов)
+
+          # Ресурсы (ВСЕГДА указывай!)
+          resources:
+            requests:
+              memory: "256Mi"   # Гарантированная память
+              cpu: "250m"       # 0.25 CPU (250 millicores)
+            limits:
+              memory: "512Mi"   # Максимальная память (OOMKill при превышении)
+              cpu: "1000m"      # 1 CPU
+
+          # Liveness probe — K8s перезапускает Pod если упал
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60    # Ждём 60с перед первой проверкой
+            periodSeconds: 30
+            failureThreshold: 3
+
+          # Readiness probe — K8s убирает Pod из балансировки если не готов
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Startup probe — для медленного старта (Java + Flyway)
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            failureThreshold: 30    # 30 * 10s = 5 минут на старт
+            periodSeconds: 10
+
+          # Volumes
+          volumeMounts:
+            - name: app-logs
+              mountPath: /app/logs
+
+      volumes:
+        - name: app-logs
+          emptyDir: {}    # Временная директория (для sidecar-логгера)
+
+      # Безопасность
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+---
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank-app-service
+  namespace: banking
+spec:
+  selector:
+    app: bank-app   # Направляет трафик на Поды с этим лейблом
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bank-ingress
+  namespace: banking
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts:
+        - api.bank.ru
+      secretName: bank-tls
+  rules:
+    - host: api.bank.ru
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bank-app-service
+                port:
+                  number: 80
+
+---
+# hpa.yaml — Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bank-app-hpa
+  namespace: banking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bank-app
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70   # Масштабировать при CPU > 70%
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+─── 4.4 KUBECTL КОМАНДЫ ────────────────────────────────────────────────────────
+
+# Применить манифесты:
+  kubectl apply -f deployment.yaml
+  kubectl apply -f ./k8s/           # Все файлы в директории
+
+# Посмотреть состояние:
+  kubectl get pods -n banking
+  kubectl get pods -n banking -w    # Watch (обновляется в реальном времени)
+  kubectl get all -n banking        # Всё: pods, svc, deploy...
+  kubectl describe pod bank-app-xyz -n banking   # Детальная инфо (Events!)
+  kubectl get events -n banking --sort-by='.lastTimestamp'
+
+# Логи:
+  kubectl logs bank-app-xyz -n banking
+  kubectl logs bank-app-xyz -n banking -f    # Follow
+  kubectl logs bank-app-xyz -n banking --previous   # Предыдущий контейнер (если упал)
+  kubectl logs -l app=bank-app -n banking    # Логи всех Подов с лейблом
+
+# Дебаг:
+  kubectl exec -it bank-app-xyz -n banking -- sh
+  kubectl port-forward pod/bank-app-xyz 8080:8080 -n banking   # Проброс порта
+
+# Обновление образа (rolling update):
+  kubectl set image deployment/bank-app bank-app=registry/bank:1.2.4 -n banking
+
+# Откат:
+  kubectl rollout history deployment/bank-app -n banking
+  kubectl rollout undo deployment/bank-app -n banking
+  kubectl rollout undo deployment/bank-app --to-revision=2 -n banking
+
+# Масштабирование:
+  kubectl scale deployment bank-app --replicas=5 -n banking
+
+─── 4.5 СТРАТЕГИИ ДЕПЛОЯ ───────────────────────────────────────────────────────
+
+ROLLING UPDATE (по умолчанию):
+  [v1][v1][v1]  →  [v2][v1][v1]  →  [v2][v2][v1]  →  [v2][v2][v2]
+  Постепенно. Нет простоя. Оба версии работают одновременно.
+
+BLUE-GREEN:
+  Запускаем полный новый стек (Green), тестируем, переключаем трафик.
+  Blue (старая)   ← 100% трафика
+  Green (новая)   ← 0%
+  Тест Green... ОК → переключаем → Green ← 100% трафика
+  Blue можно держать для быстрого откатa.
+
+CANARY:
+  Направляем малый % трафика на новую версию:
+  v1: 95% трафика  |  v2: 5% трафика
+  Мониторим ошибки → постепенно увеличиваем до 100%
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 5: МОНИТОРИНГ И ЛОГИРОВАНИЕ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 5.1 ТРИ СТОЛПА OBSERVABILITY ──────────────────────────────────────────────
+
+МЕТРИКИ (Metrics) — числа во времени (CPU, запросы/сек, latency, ошибки).
+ЛОГИ (Logs) — текстовые события (что произошло, когда, с кем).
+ТРЕЙСЫ (Traces) — путь запроса через микросервисы.
+
+─── 5.2 PROMETHEUS + GRAFANA ───────────────────────────────────────────────────
+
+Prometheus — time-series база данных для метрик. PULL-модель (сам тянет).
+Grafana — красивые дашборды на основе данных Prometheus.
+
+Spring Boot + Micrometer (подключение):
+
+# pom.xml
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+
+# application.yml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true   # /actuator/health/liveness, /actuator/health/readiness
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${spring.profiles.active}
+
+# Кастомные метрики в коде:
+@Service
+public class TransferService {
+    private final Counter transferCounter;
+    private final Timer transferTimer;
+    private final Gauge activeTransfers;
+
+    public TransferService(MeterRegistry registry) {
+        this.transferCounter = Counter.builder("bank.transfers.total")
+            .tag("type", "domestic")
+            .description("Total transfers processed")
+            .register(registry);
+
+        this.transferTimer = Timer.builder("bank.transfers.duration")
+            .description("Transfer processing time")
+            .register(registry);
+
+        AtomicInteger active = new AtomicInteger();
+        this.activeTransfers = Gauge.builder("bank.transfers.active", active, AtomicInteger::get)
+            .register(registry);
+    }
+
+    public TransferResult transfer(TransferRequest req) {
+        return transferTimer.record(() -> {
+            transferCounter.increment();
+            // ... логика
+        });
+    }
+}
+
+# prometheus.yml — конфиг Prometheus
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'bank-app'
+    static_configs:
+      - targets: ['bank-app:8080']
+    metrics_path: '/actuator/prometheus'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - 'alerts.yml'
+
+# alerts.yml — правила алертинга
+groups:
+  - name: bank-app
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          rate(http_server_requests_seconds_count{status=~"5.."}[5m])
+          / rate(http_server_requests_seconds_count[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.instance }}"
+          description: "Error rate > 5% for 5 minutes"
+
+      - alert: SlowResponse
+        expr: |
+          histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 latency > 2s"
+
+─── 5.3 ELK STACK (ЛОГИРОВАНИЕ) ────────────────────────────────────────────────
+
+Elasticsearch — поиск и хранение логов
+Logstash / Filebeat — сбор и парсинг логов
+Kibana — визуализация
+
+FLOW: App → Logstash/Filebeat → Elasticsearch → Kibana
+
+Spring Boot → структурированные логи (JSON):
+
+# pom.xml
+<dependency>
+    <groupId>net.logstash.logback</groupId>
+    <artifactId>logstash-logback-encoder</artifactId>
+    <version>7.4</version>
+</dependency>
+
+# logback-spring.xml
+<configuration>
+    <springProperty name="APP_NAME" source="spring.application.name"/>
+
+    <!-- JSON для продакшена -->
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"app":"${APP_NAME}","env":"${SPRING_PROFILES_ACTIVE}"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- Plaintext для разработки -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <springProfile name="prod">
+        <root level="INFO"><appender-ref ref="JSON"/></root>
+    </springProfile>
+    <springProfile name="!prod">
+        <root level="DEBUG"><appender-ref ref="CONSOLE"/></root>
+    </springProfile>
+</configuration>
+
+Структурированный лог (JSON):
+{
+  "@timestamp": "2024-01-15T10:30:00.000Z",
+  "level": "ERROR",
+  "message": "Transfer failed",
+  "logger_name": "com.bank.service.TransferService",
+  "app": "bank-app",
+  "env": "production",
+  "traceId": "abc123",
+  "spanId": "def456",
+  "userId": "12345",
+  "transferId": "TRN-789"
+}
+
+─── 5.4 DISTRIBUTED TRACING (OpenTelemetry) ────────────────────────────────────
+
+Трейсинг — отслеживание запроса через несколько микросервисов.
+
+  Client → API Gateway → [TraceID: abc, SpanID: 1]
+    → Transfer Service [TraceID: abc, SpanID: 2, ParentSpan: 1]
+      → Account Service [TraceID: abc, SpanID: 3, ParentSpan: 2]
+      → Notification Service [TraceID: abc, SpanID: 4, ParentSpan: 2]
+
+# pom.xml (Spring Boot 3.x — micrometer tracing)
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-tracing-bridge-otel</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.opentelemetry</groupId>
+    <artifactId>opentelemetry-exporter-otlp</artifactId>
+</dependency>
+
+# application.yml
+management:
+  tracing:
+    sampling:
+      probability: 0.1   # Семплировать 10% запросов (prod)
+  otlp:
+    tracing:
+      endpoint: http://otel-collector:4318/v1/traces
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 6: INFRASTRUCTURE AS CODE (TERRAFORM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Terraform — описываем инфраструктуру в коде (IaC). Один инструмент для AWS/GCP/Azure.
+
+─── 6.1 БАЗОВЫЙ ПРИМЕР (AWS) ───────────────────────────────────────────────────
+
+# main.tf — деплоим банковское приложение в AWS
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  # Хранить state в S3 (НЕ локально в команде!)
+  backend "s3" {
+    bucket = "bank-terraform-state"
+    key    = "production/bank-app/terraform.tfstate"
+    region = "eu-central-1"
+    encrypt = true
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+# VPC (изолированная сеть)
+resource "aws_vpc" "bank_vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  tags = {
+    Name        = "bank-vpc"
+    Environment = var.environment
+  }
+}
+
+# Публичная подсеть (для load balancer)
+resource "aws_subnet" "public" {
+  count             = 2
+  vpc_id            = aws_vpc.bank_vpc.id
+  cidr_block        = "10.0.${count.index}.0/24"
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = true
+}
+
+# Приватная подсеть (для приложений и БД)
+resource "aws_subnet" "private" {
+  count             = 2
+  vpc_id            = aws_vpc.bank_vpc.id
+  cidr_block        = "10.0.${count.index + 10}.0/24"
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+}
+
+# RDS PostgreSQL
+resource "aws_db_instance" "postgres" {
+  identifier        = "bank-postgres-${var.environment}"
+  engine            = "postgres"
+  engine_version    = "15.3"
+  instance_class    = "db.t3.medium"
+  allocated_storage = 100
+  storage_encrypted = true
+
+  db_name  = "bankdb"
+  username = "bankuser"
+  password = var.db_password   # из переменных, не в коде!
+
+  vpc_security_group_ids = [aws_security_group.rds.id]
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+
+  backup_retention_period = 7
+  multi_az                = var.environment == "production"
+  deletion_protection     = var.environment == "production"
+
+  tags = { Environment = var.environment }
+}
+
+# EKS кластер (Kubernetes)
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
+
+  cluster_name    = "bank-cluster-${var.environment}"
+  cluster_version = "1.28"
+
+  vpc_id     = aws_vpc.bank_vpc.id
+  subnet_ids = aws_subnet.private[*].id
+
+  eks_managed_node_groups = {
+    main = {
+      min_size     = 2
+      max_size     = 10
+      desired_size = 3
+      instance_types = ["t3.medium"]
+    }
+  }
+}
+
+# variables.tf
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "development"
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true   # Не выводить в логах!
+}
+
+─── КОМАНДЫ TERRAFORM ──────────────────────────────────────────────────────────
+
+  terraform init              # Инициализация (скачать провайдеры)
+  terraform plan              # Показать что изменится (DRY RUN)
+  terraform apply             # Применить изменения
+  terraform apply -auto-approve  # Без подтверждения (только в CI!)
+  terraform destroy           # Удалить всю инфраструктуру (ОСТОРОЖНО!)
+  terraform show              # Текущее состояние
+  terraform state list        # Список ресурсов в state
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 7: ОБЛАКА ДЛЯ JAVA РАЗРАБОТЧИКА
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── AWS (AMAZON WEB SERVICES) ──────────────────────────────────────────────────
+
+Сервис          │ Что это                    │ Банковый use case
+────────────────┼────────────────────────────┼──────────────────────────────
+EC2             │ Виртуальные машины         │ Запуск микросервисов
+RDS             │ Managed PostgreSQL/MySQL   │ Основная БД
+ElastiCache     │ Managed Redis              │ Сессии, кеш, rate limiting
+EKS             │ Managed Kubernetes         │ Оркестрация микросервисов
+ECR             │ Docker Registry            │ Хранение Docker образов
+S3              │ Object Storage             │ Выписки, документы, бэкапы
+SQS/SNS         │ Очереди и нотификации      │ Асинхронные платежи
+Secrets Manager │ Хранение секретов          │ Пароли БД, API ключи
+CloudWatch      │ Логи и метрики             │ Мониторинг
+ALB             │ Application Load Balancer  │ Маршрутизация HTTP трафика
+WAF             │ Web Application Firewall   │ Защита от атак
+
+─── MANAGED VS SELF-HOSTED ─────────────────────────────────────────────────────
+
+Managed (облако управляет):        Self-hosted (ты управляешь):
+  + Нет операционной нагрузки        + Полный контроль
+  + Автоматические бэкапы            + Дешевле при большом масштабе
+  + Масштабирование одной кнопкой    - Нужна DevOps команда
+  + HA из коробки                    - Ты ответственен за всё
+  - Дороже                           + Нет vendor lock-in
+  - Vendor lock-in
+  - Данные у провайдера (GDPR!)
+
+Банки в России: VK Cloud, Yandex Cloud, собственные дата-центры.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 8: DEPLOYMENT STRATEGIES (ПОДРОБНО)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── ZERO-DOWNTIME DEPLOY ───────────────────────────────────────────────────────
+
+1. Backward-compatible DB миграции (Flyway):
+   Никогда не удаляй колонку сразу!
+
+   Step 1 (deploy v1.1): ADD COLUMN new_field TEXT   — добавляем
+   Step 2 (deploy v1.1): Код читает И из old_field, и из new_field
+   Step 3 (deploy v1.2): Мигрируем данные: UPDATE SET new_field = old_field
+   Step 4 (deploy v1.3): Код читает только new_field
+   Step 5 (deploy v1.4): DROP COLUMN old_field        — удаляем
+
+2. Feature flags (постепенный rollout):
+   if (featureFlags.isEnabled("new-payment-flow", userId)) {
+       return newPaymentFlow(request);
+   } else {
+       return legacyPaymentFlow(request);
+   }
+
+3. Graceful shutdown Spring Boot:
+   # application.yml
+   server:
+     shutdown: graceful    # Дождаться завершения текущих запросов
+   spring:
+     lifecycle:
+       timeout-per-shutdown-phase: 30s   # Максимум 30 секунд
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 9: SRE ПРАКТИКИ (НАДЁЖНОСТЬ)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SLI (Service Level Indicator) — измеримая метрика
+  Примеры: availability (%), latency (ms), error rate (%)
+
+SLO (Service Level Objective) — цель по SLI
+  Пример: "P99 latency < 500ms, availability > 99.9%"
+
+SLA (Service Level Agreement) — юридическое соглашение с клиентом
+  Пример: "Если uptime < 99.5% — возмещаем 10% стоимости"
+
+Error Budget — "бюджет ошибок"
+  99.9% uptime = 8.7 часов простоя в год — это твой Error Budget
+  Если бюджет исчерпан — стоп деплоям, фокус на надёжность
+
+TOIL (рутинная работа) — автоматизируй если занимает > 2 часов в неделю
+
+Runbook — инструкция что делать при конкретном алерте:
+  Alert: HighErrorRate
+  1. Проверить логи: kubectl logs -l app=bank-app | grep ERROR
+  2. Проверить метрики: Grafana → Bank Dashboard → Error Rate
+  3. Если новый деплой — откатить: kubectl rollout undo deployment/bank-app
+  4. Если проблема с БД — проверить connections: SELECT count(*) FROM pg_stat_activity
+  5. Эскалировать к дежурному DBA если не решено за 15 минут
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 10: ВОПРОСЫ НА СОБЕСЕДОВАНИИ ПО DEVOPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+JUNIOR:
+  Q: Чем Docker отличается от виртуальной машины?
+  A: VM эмулирует железо (гипервизор), у каждой своя ОС — тяжело (~GB).
+     Docker контейнеры делят ядро ОС, изолируются через namespaces/cgroups — легко (~MB).
+
+  Q: Что такое CI/CD?
+  A: CI = автоматическая сборка и тестирование при каждом пуше.
+     CD = автоматическая доставка протестированного кода в среду (staging/prod).
+
+  Q: Что происходит при "docker run"?
+  A: Docker ищет образ локально → pull из registry если нет → создаёт контейнер
+     (writable layer поверх read-only layers образа) → запускает CMD/ENTRYPOINT.
+
+MIDDLE:
+  Q: Чем CMD отличается от ENTRYPOINT в Dockerfile?
+  A: ENTRYPOINT — основная команда, не переопределяется при run.
+     CMD — аргументы по умолчанию, переопределяются: docker run image arg1 arg2.
+     Вместе: ENTRYPOINT["java", "-jar"] CMD["app.jar"] → java -jar app.jar.
+
+  Q: Что такое liveness vs readiness probe?
+  A: Liveness — "живой ли Pod?". Если нет — K8s перезапустит.
+     Readiness — "готов ли принимать трафик?". Если нет — убирает из балансировки.
+     Startup — только при старте, даёт время медленному приложению запуститься.
+
+  Q: Как обеспечить zero-downtime деплой в K8s?
+  A: RollingUpdate с maxUnavailable: 0, readiness probe для проверки готовности,
+     graceful shutdown в Spring Boot, backward-compatible DB миграции.
+
+SENIOR:
+  Q: Как оптимизировать Docker образ?
+  A: Multi-stage build (только runtime в финальном образе),
+     выбор минимального base image (alpine),
+     правильный порядок слоёв (редкоизменяемые — выше),
+     .dockerignore, non-root user.
+
+  Q: Как предотвратить OOMKill в Kubernetes?
+  A: Установить memory limits = requests (гарантированный QoS класс),
+     настроить JVM с -XX:MaxRAMPercentage=75 (оставить место для метаспейса),
+     включить UseContainerSupport, мониторить через metrics-server.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ★ ЗАДАНИЯ ДЛЯ ТЕБЯ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DOCKER (Практика):
+   Напиши Dockerfile для своего банковского приложения.
+   - Multi-stage build (Maven → JRE)
+   - Non-root пользователь
+   - HEALTHCHECK на /actuator/health
+   - Запусти: docker build -t bank:test . && docker run -p 8080:8080 bank:test
+
+2. DOCKER COMPOSE:
+   Создай docker-compose.yml с:
+   - PostgreSQL 15
+   - Redis 7
+   - Своим Spring Boot приложением
+   - Nginx как reverse proxy
+   Проверь что приложение стартует и БД доступна.
+
+3. CI PIPELINE (GitHub Actions):
+   Создай .github/workflows/ci.yml который:
+   - Запускает mvn test на каждый PR
+   - Запускает с PostgreSQL service
+   - Падает если тесты не прошли
+
+4. KUBERNETES МАНИФЕСТ:
+   Напиши Deployment + Service для банковского приложения:
+   - 3 реплики
+   - Resource limits: 512Mi memory, 500m cpu
+   - Readiness probe на /actuator/health
+   - Environment переменные из ConfigMap и Secret
+   - Rolling update strategy с maxUnavailable: 0
+
+5. МОНИТОРИНГ:
+   Добавь в Spring Boot приложение кастомные метрики:
+   - Counter для успешных/неуспешных переводов
+   - Timer для времени обработки перевода
+   - Gauge для текущего баланса пула ликвидности
+
+6. LINUX (Обязательно!):
+   На любой Linux VM (можно WSL или Docker):
+   - Напиши bash скрипт деплоя: pull образ → stop старый → start новый
+   - Настрой systemd unit для своего приложения
+   - Научись читать логи: journalctl, tail -f, grep ошибок
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  РЕСУРСЫ ДЛЯ ИЗУЧЕНИЯ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+YouTube:
+  TechWorld with Nana — Docker и Kubernetes с нуля (ЛУЧШИЙ канал)
+  DevOps Directive — практические туториалы
+  Kodekloud — интерактивные лаборатории
+
+Книги:
+  "The Phoenix Project" — что такое DevOps культура
+  "Site Reliability Engineering" (Google SRE book) — бесплатно онлайн
+  "Kubernetes in Action" (Marko Luksa) — глубокое погружение
+
+Практика:
+  Play with Docker (labs.play-with-docker.com) — браузерный Docker
+  Play with Kubernetes (labs.play-with-k8s.com) — браузерный K8s
+  Killercoda — интерактивные лаборатории по K8s
+  KodeKloud — лучшие практические курсы по DevOps

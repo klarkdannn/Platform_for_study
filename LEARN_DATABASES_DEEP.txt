@@ -1,0 +1,468 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║          БАЗЫ ДАННЫХ — ГЛУБОКОЕ ПОГРУЖЕНИЕ                                       ║
+║  PostgreSQL, SQL задачи, индексы, транзакции, оптимизация, Spring JPA           ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЧАСТЬ 1: ПРОЕКТИРОВАНИЕ СХЕМЫ БАНКОВСКОЙ БД
+═══════════════════════════════════════════════════════════════════════════════════
+
+НОРМАЛИЗАЦИЯ:
+  1NF — нет повторяющихся групп, у каждой колонки атомарное значение.
+        Не: "телефоны: '79001234567, 79007654321'" (два значения в одной колонке!)
+        Да:  отдельная таблица client_phones.
+
+  2NF — 1NF + каждый неключевой атрибут зависит от ВСЕГО первичного ключа.
+        Нарушение: ключ (client_id, account_id), но city зависит только от client_id.
+
+  3NF — 2NF + нет транзитивных зависимостей.
+        Нарушение: account_id → branch_id → branch_address (адрес зависит от отделения, не от счёта).
+        Вынеси branches в отдельную таблицу.
+
+СХЕМА БАНКА (PostgreSQL):
+
+  -- Клиенты
+  CREATE TABLE clients (
+      id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      full_name     VARCHAR(200) NOT NULL,
+      passport      VARCHAR(20)  UNIQUE NOT NULL,
+      email         VARCHAR(100) UNIQUE,
+      phone         VARCHAR(20),
+      date_of_birth DATE        NOT NULL,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  -- Счета
+  CREATE TABLE accounts (
+      id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      client_id      UUID         NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
+      account_number VARCHAR(20)  UNIQUE NOT NULL,
+      type           VARCHAR(20)  NOT NULL CHECK (type IN ('DEBIT','SAVINGS','CREDIT')),
+      currency       CHAR(3)      NOT NULL DEFAULT 'RUB',
+      balance        NUMERIC(19,4) NOT NULL DEFAULT 0,
+      credit_limit   NUMERIC(19,4),
+      interest_rate  NUMERIC(5,2),
+      status         VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+      version        BIGINT       NOT NULL DEFAULT 0,  -- оптимистическая блокировка
+      opened_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      closed_at      TIMESTAMPTZ
+  );
+
+  -- Транзакции
+  CREATE TABLE transactions (
+      id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+      account_id      UUID         NOT NULL REFERENCES accounts(id),
+      counterpart_id  UUID         REFERENCES accounts(id),
+      type            VARCHAR(30)  NOT NULL,
+      amount          NUMERIC(19,4) NOT NULL CHECK (amount > 0),
+      balance_after   NUMERIC(19,4) NOT NULL,
+      description     VARCHAR(500),
+      status          VARCHAR(20)  NOT NULL DEFAULT 'COMPLETED',
+      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  ) PARTITION BY RANGE (created_at);  -- партиционирование по дате!
+
+  -- Партиции по году:
+  CREATE TABLE transactions_2024 PARTITION OF transactions
+      FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+  CREATE TABLE transactions_2025 PARTITION OF transactions
+      FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
+
+  -- Индексы:
+  CREATE INDEX idx_accounts_client ON accounts(client_id);
+  CREATE INDEX idx_transactions_account ON transactions(account_id);
+  CREATE INDEX idx_transactions_date ON transactions(created_at DESC);  -- для сортировки
+  CREATE INDEX idx_transactions_compound ON transactions(account_id, created_at DESC);  -- составной!
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЧАСТЬ 2: SQL ЗАДАЧИ ДЛЯ БАНКА
+═══════════════════════════════════════════════════════════════════════════════════
+(Выполняй эти задачи в psql или DBeaver)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ЗАДАЧА 1: Основные SELECT запросы
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 1.1. Все клиенты с балансом больше 100 000:
+SELECT c.full_name, SUM(a.balance) as total_balance
+FROM clients c
+JOIN accounts a ON a.client_id = c.id
+WHERE a.status = 'ACTIVE'
+GROUP BY c.id, c.full_name
+HAVING SUM(a.balance) > 100000
+ORDER BY total_balance DESC;
+
+-- 1.2. Топ-10 транзакций за последние 7 дней:
+SELECT t.id, a.account_number, c.full_name, t.type, t.amount, t.created_at
+FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN clients c ON c.id = a.client_id
+WHERE t.created_at >= NOW() - INTERVAL '7 days'
+ORDER BY t.amount DESC
+LIMIT 10;
+
+-- 1.3. Клиенты без ни одной транзакции (LEFT JOIN + NULL check):
+SELECT c.full_name, c.email
+FROM clients c
+LEFT JOIN accounts a ON a.client_id = c.id
+LEFT JOIN transactions t ON t.account_id = a.id
+WHERE t.id IS NULL;
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ЗАДАЧА 2: Агрегация и GROUP BY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 2.1. Статистика транзакций по типу за месяц:
+SELECT
+    type,
+    COUNT(*) as count,
+    SUM(amount) as total,
+    AVG(amount) as average,
+    MIN(amount) as min_amount,
+    MAX(amount) as max_amount
+FROM transactions
+WHERE created_at >= DATE_TRUNC('month', NOW())
+GROUP BY type
+ORDER BY total DESC;
+
+-- 2.2. Ежедневный оборот за последние 30 дней:
+SELECT
+    created_at::DATE as day,
+    COUNT(*) as transactions_count,
+    SUM(amount) as daily_volume,
+    SUM(CASE WHEN type = 'DEPOSIT' THEN amount ELSE 0 END) as deposits,
+    SUM(CASE WHEN type = 'WITHDRAWAL' THEN amount ELSE 0 END) as withdrawals
+FROM transactions
+WHERE created_at >= NOW() - INTERVAL '30 days'
+GROUP BY created_at::DATE
+ORDER BY day;
+
+-- 2.3. Клиенты с подозрительной активностью (>50 транзакций за день):
+SELECT
+    c.full_name,
+    a.account_number,
+    t.created_at::DATE as day,
+    COUNT(*) as tx_count,
+    SUM(t.amount) as day_total
+FROM transactions t
+JOIN accounts a ON a.id = t.account_id
+JOIN clients c ON c.id = a.client_id
+WHERE t.created_at >= NOW() - INTERVAL '30 days'
+GROUP BY c.full_name, a.account_number, t.created_at::DATE
+HAVING COUNT(*) > 50
+ORDER BY tx_count DESC;
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ЗАДАЧА 3: Оконные функции (Window Functions) — продвинутый SQL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 3.1. Накопительный баланс (running total):
+SELECT
+    created_at,
+    type,
+    amount,
+    SUM(CASE WHEN type IN ('DEPOSIT','TRANSFER_IN') THEN amount ELSE -amount END)
+        OVER (PARTITION BY account_id ORDER BY created_at)
+        AS running_balance
+FROM transactions
+WHERE account_id = 'your-account-id'
+ORDER BY created_at;
+
+-- 3.2. Ранжирование клиентов по балансу (RANK, DENSE_RANK, ROW_NUMBER):
+SELECT
+    c.full_name,
+    a.balance,
+    RANK() OVER (ORDER BY a.balance DESC) as rank,
+    NTILE(4) OVER (ORDER BY a.balance DESC) as quartile  -- 1=топ 25%, 4=нижние 25%
+FROM accounts a
+JOIN clients c ON c.id = a.client_id
+WHERE a.status = 'ACTIVE';
+
+-- 3.3. LAG/LEAD — предыдущее/следующее значение:
+SELECT
+    created_at::DATE as day,
+    SUM(amount) as daily_total,
+    LAG(SUM(amount)) OVER (ORDER BY created_at::DATE) as prev_day,
+    SUM(amount) - LAG(SUM(amount)) OVER (ORDER BY created_at::DATE) as change,
+    ROUND(100.0 * (SUM(amount) - LAG(SUM(amount)) OVER (ORDER BY created_at::DATE))
+          / LAG(SUM(amount)) OVER (ORDER BY created_at::DATE), 2) as pct_change
+FROM transactions
+GROUP BY created_at::DATE
+ORDER BY day;
+
+-- 3.4. Последняя транзакция каждого счёта (DISTINCT ON в PostgreSQL):
+SELECT DISTINCT ON (account_id)
+    account_id,
+    type,
+    amount,
+    created_at
+FROM transactions
+ORDER BY account_id, created_at DESC;
+
+-- Альтернатива с ROW_NUMBER():
+WITH ranked AS (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY created_at DESC) as rn
+    FROM transactions
+)
+SELECT * FROM ranked WHERE rn = 1;
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ЗАДАЧА 4: CTE (Common Table Expressions) — WITH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- 4.1. Клиенты категории "Премиум" + их топ транзакция:
+WITH premium_clients AS (
+    SELECT c.id, c.full_name, SUM(a.balance) as total_balance
+    FROM clients c
+    JOIN accounts a ON a.client_id = c.id
+    WHERE a.status = 'ACTIVE'
+    GROUP BY c.id, c.full_name
+    HAVING SUM(a.balance) > 1000000
+),
+top_transactions AS (
+    SELECT DISTINCT ON (a.client_id)
+        a.client_id,
+        t.amount as top_transaction,
+        t.created_at
+    FROM transactions t
+    JOIN accounts a ON a.id = t.account_id
+    ORDER BY a.client_id, t.amount DESC
+)
+SELECT
+    pc.full_name,
+    pc.total_balance,
+    tt.top_transaction
+FROM premium_clients pc
+JOIN top_transactions tt ON tt.client_id = pc.id
+ORDER BY pc.total_balance DESC;
+
+-- 4.2. Рекурсивный CTE — иерархия (например, корпоративные клиенты):
+WITH RECURSIVE corporate_hierarchy AS (
+    -- базовый случай: головная компания
+    SELECT id, name, parent_id, 0 as level
+    FROM companies WHERE parent_id IS NULL
+
+    UNION ALL
+
+    -- рекурсивный шаг: дочерние компании
+    SELECT c.id, c.name, c.parent_id, h.level + 1
+    FROM companies c
+    JOIN corporate_hierarchy h ON h.id = c.parent_id
+)
+SELECT * FROM corporate_hierarchy ORDER BY level, name;
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ЗАДАЧА 5: Транзакция перевода (атомарный SQL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BEGIN;
+
+-- Блокируем оба счёта для предотвращения deadlock (всегда в одном порядке!):
+SELECT id, balance FROM accounts
+WHERE id IN ('from-id', 'to-id')
+ORDER BY id  -- ПОРЯДОК ВАЖЕН для предотвращения deadlock!
+FOR UPDATE;
+
+-- Проверяем баланс (в приложении, но здесь для демонстрации):
+DO $$
+DECLARE
+    v_balance NUMERIC;
+BEGIN
+    SELECT balance INTO v_balance FROM accounts WHERE id = 'from-id';
+    IF v_balance < 1000 THEN
+        RAISE EXCEPTION 'Недостаточно средств: % < 1000', v_balance;
+    END IF;
+END $$;
+
+-- Списание:
+UPDATE accounts
+SET balance = balance - 1000, version = version + 1, updated_at = NOW()
+WHERE id = 'from-id';
+
+-- Зачисление:
+UPDATE accounts
+SET balance = balance + 1000, version = version + 1, updated_at = NOW()
+WHERE id = 'to-id';
+
+-- Записать транзакции:
+INSERT INTO transactions (account_id, counterpart_id, type, amount, balance_after, description)
+SELECT 'from-id', 'to-id', 'TRANSFER_OUT', 1000,
+       (SELECT balance FROM accounts WHERE id = 'from-id'), 'Перевод';
+
+INSERT INTO transactions (account_id, counterpart_id, type, amount, balance_after, description)
+SELECT 'to-id', 'from-id', 'TRANSFER_IN', 1000,
+       (SELECT balance FROM accounts WHERE id = 'to-id'), 'Поступление перевода';
+
+COMMIT;
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЧАСТЬ 3: ИНДЕКСЫ — ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ
+═══════════════════════════════════════════════════════════════════════════════════
+
+КАК ПОНЯТЬ ЧТО НУЖЕН ИНДЕКС:
+  EXPLAIN ANALYZE SELECT * FROM transactions WHERE account_id = 'some-id';
+  -- Seq Scan      → нет индекса → медленно при большой таблице
+  -- Index Scan    → есть индекс → быстро
+  -- Bitmap Scan   → несколько совпадений → пакетное использование индекса
+
+Типы индексов и когда использовать:
+
+B-Tree (дефолт):
+  Хорош для: =, <, >, BETWEEN, ORDER BY, LIKE 'prefix%' (НО НЕ '%suffix'!)
+  CREATE INDEX ON transactions(account_id);               -- равенство
+  CREATE INDEX ON transactions(created_at DESC);          -- сортировка
+  CREATE INDEX ON transactions(account_id, created_at);   -- составной
+
+Hash (только для =):
+  CREATE INDEX ON accounts USING HASH (account_number);   -- только '='
+
+Partial Index (частичный — индексирует только часть строк):
+  CREATE INDEX ON accounts(client_id) WHERE status = 'ACTIVE';
+  -- Только активные счета! Меньше размер, быстрее обновление.
+  -- Используй если запрос всегда фильтрует по этому условию.
+
+Expression Index (по выражению):
+  CREATE INDEX ON clients(LOWER(email));   -- поиск без учёта регистра
+  -- Запрос: WHERE LOWER(email) = 'user@bank.ru'
+
+GiST / GIN для full-text search:
+  CREATE INDEX ON transactions USING GIN(to_tsvector('russian', description));
+  -- Поиск: WHERE to_tsvector('russian', description) @@ to_tsquery('мошенник')
+
+ПРАВИЛА СОСТАВНЫХ ИНДЕКСОВ:
+  Индекс (a, b, c):
+    ✓ WHERE a = ?                      ← использует
+    ✓ WHERE a = ? AND b = ?            ← использует
+    ✓ WHERE a = ? AND b = ? AND c = ?  ← использует
+    ✓ WHERE a = ? ORDER BY b           ← использует для сортировки
+    ✗ WHERE b = ?                      ← НЕ использует (пропускает a)
+    ✗ WHERE c = ?                      ← НЕ использует
+
+  Правило: используются слева направо до первого диапазона или пропуска.
+
+КОГДА ИНДЕКС ВРЕДИТ:
+  - Таблица маленькая (< 1000 строк) — Seq Scan быстрее
+  - Высокая доля DML операций (INSERT/UPDATE/DELETE) — индекс замедляет запись
+  - Низкая селективность (колонка "пол" = 2 значения) — индекс не поможет
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЧАСТЬ 4: ВОПРОСЫ НА СОБЕСЕДОВАНИИ ПО БАЗАМ ДАННЫХ
+═══════════════════════════════════════════════════════════════════════════════════
+
+JUNIOR уровень:
+  Q: Что такое PRIMARY KEY и FOREIGN KEY?
+  A: PK — уникальный идентификатор строки. FK — ссылка на PK другой таблицы.
+     FK обеспечивает ссылочную целостность.
+
+  Q: Чем отличается WHERE от HAVING?
+  A: WHERE фильтрует строки ДО группировки.
+     HAVING фильтрует группы ПОСЛЕ GROUP BY.
+     WHERE быстрее (уменьшает данные раньше).
+
+  Q: Что такое NULL? Как проверить на NULL?
+  A: NULL = отсутствие значения. NULL != NULL (!)
+     Проверка: IS NULL / IS NOT NULL (не = NULL!)
+     COALESCE(column, default) — заменяет NULL значением.
+
+  Q: Типы JOIN:
+  A: INNER JOIN    — строки присутствующие в ОБЕИХ таблицах
+     LEFT JOIN     — ВСЕ строки из левой + совпадения из правой (NULL если нет)
+     RIGHT JOIN    — аналогично но наоборот
+     FULL JOIN     — ВСЕ строки из обеих таблиц
+     CROSS JOIN    — декартово произведение (каждый с каждым)
+     SELF JOIN     — таблица джойнится сама с собой (иерархии)
+
+MIDDLE уровень:
+  Q: Что такое N+1 проблема и как решить?
+  A: SELECT все счета (1 запрос) → для каждого счёта SELECT клиент (N запросов).
+     Итого: N+1 запрос. Решения:
+     1. JOIN в одном запросе
+     2. @EntityGraph в Spring Data JPA
+     3. JOIN FETCH в JPQL
+     4. @BatchSize(size=100) — батчинг загрузки связей
+
+  Q: Чем отличается TRUNCATE от DELETE?
+  A: DELETE: построчное удаление, можно WHERE, rollback-able, медленно.
+     TRUNCATE: удаляет всю таблицу разом, нельзя WHERE, не логирует строки,
+               быстро, сбрасывает sequences.
+
+  Q: Что такое индексированное представление (materialized view)?
+  A: Результат запроса сохранён на диске как таблица.
+     Очень быстрые чтения. Нужно обновлять (REFRESH MATERIALIZED VIEW).
+     Банк: предрасчитанные отчёты, агрегаты.
+
+  Q: Объясни уровни изоляции транзакций:
+  A: READ UNCOMMITTED — видит незафиксированные изменения (dirty read)
+     READ COMMITTED   — видит только зафиксированные (non-repeatable read возможен)
+     REPEATABLE READ  — данные не меняются внутри транзакции (phantom read возможен в некоторых БД)
+     SERIALIZABLE     — полная изоляция, нет фантомных чтений
+
+  Q: Что такое deadlock и как предотвратить?
+  A: Транзакция А блокирует ресурс 1, ждёт ресурс 2.
+     Транзакция Б блокирует ресурс 2, ждёт ресурс 1.
+     Круговое ожидание = deadlock.
+     Предотвращение: всегда блокировать ресурсы В ОДНОМ ПОРЯДКЕ
+     (ORDER BY id при SELECT FOR UPDATE).
+
+SENIOR уровень:
+  Q: Как бы ты оптимизировал медленный запрос?
+  A: 1. EXPLAIN ANALYZE — смотрю план выполнения
+     2. Seq Scan → добавить индекс на колонку фильтрации
+     3. Много строк после JOIN → JOIN condition + индексы
+     4. Nested Loop на большой таблице → Hash Join / Merge Join
+     5. Много строк в working memory → увеличить work_mem
+     6. Партиционирование если таблица очень большая
+
+  Q: Что такое MVCC (Multi-Version Concurrency Control)?
+  A: PostgreSQL хранит несколько версий каждой строки.
+     Читатели не блокируют писателей и наоборот.
+     Каждая транзакция видит "снимок" БД на момент начала.
+     Старые версии убираются VACUUM процессом.
+
+  Q: Как реализовать "мягкое удаление" (soft delete)?
+  A: Добавить поле deleted_at TIMESTAMPTZ.
+     Вместо DELETE — UPDATE clients SET deleted_at = NOW().
+     Все запросы: WHERE deleted_at IS NULL.
+     Частичный индекс: CREATE INDEX ON clients(id) WHERE deleted_at IS NULL;
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЧАСТЬ 5: CONNECTION POOLING
+═══════════════════════════════════════════════════════════════════════════════════
+Открытие соединения с PostgreSQL = ~50мс. Дорого!
+Connection Pool хранит пул готовых соединений.
+
+HikariCP (по умолчанию в Spring Boot — самый быстрый):
+  spring.datasource.hikari.maximum-pool-size=10       ← не более 10 соединений
+  spring.datasource.hikari.minimum-idle=5             ← минимум в пуле
+  spring.datasource.hikari.connection-timeout=30000   ← ждать соединения 30 сек
+  spring.datasource.hikari.idle-timeout=600000        ← убрать idle соединение через 10 мин
+  spring.datasource.hikari.max-lifetime=1800000       ← заменить соединение через 30 мин
+
+ПРАВИЛО: pool_size = (2 * ядра_CPU) + количество_дисков
+  Сервер с 4 ядрами → pool_size ≈ 10
+  Банальная ошибка: pool_size = 100 при 4 ядрах → хуже чем 10!
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЧАСТЬ 6: FLYWAY — МИГРАЦИИ
+═══════════════════════════════════════════════════════════════════════════════════
+
+Структура:
+  src/main/resources/db/migration/
+    V1__create_clients_table.sql
+    V2__create_accounts_table.sql
+    V3__add_version_column.sql
+    R__create_views.sql         ← R = Repeatable (выполняется при изменении)
+
+Соглашения имён:
+  V{версия}__{описание}.sql    — версионированная (выполняется ОДИН РАЗ)
+  U{версия}__{описание}.sql    — undo (откат)
+  R__{описание}.sql            — повторяемая (если контент изменился)
+
+Полезные команды (Maven):
+  mvn flyway:info      — текущее состояние миграций
+  mvn flyway:migrate   — применить новые
+  mvn flyway:repair    — починить после ошибки
+
+Как добавить колонку без downtime:
+  1. V10__add_new_column_nullable.sql  → ALTER TABLE ADD COLUMN x VARCHAR(100);
+     (nullable — не нарушает существующие INSERT)
+  2. Деплоим приложение — оно теперь пишет в новую колонку
+  3. V11__backfill_new_column.sql → UPDATE table SET x = 'default' WHERE x IS NULL;
+     (батчами! не всё сразу — не блочим таблицу)
+  4. V12__make_column_not_null.sql → ALTER TABLE ALTER COLUMN x SET NOT NULL;

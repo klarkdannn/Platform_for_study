@@ -1,0 +1,572 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║          УЧЕБНЫЙ ПЛАН: JAVA + SPRING BOOT — ПРОЕКТ "БАНК"                      ║
+║          От новичка до профессионала                                            ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+КАК ПОЛЬЗОВАТЬСЯ ЭТИМ ФАЙЛОМ:
+  [ ] — задача НЕ выполнена (твоя работа)
+  [x] — задача ВЫПОЛНЕНА (уже написан код-пример)
+  [?] — задача ЧАСТИЧНО выполнена (есть пример, нужно дописать)
+
+ЛОГИКА РЕАЛЬНОГО БАНКА (справка):
+  • Клиент (Client) открывает счёт (Account) в банке
+  • Счета бывают: дебетовый (DebitAccount), накопительный (SavingsAccount), кредитный (CreditAccount)
+  • Клиент пополняет счёт (deposit), снимает деньги (withdraw), делает переводы (transfer)
+  • Каждая операция — это транзакция (Transaction) с датой, суммой, типом
+  • На накопительный счёт начисляются проценты (interest rate)
+  • Кредитный счёт имеет лимит (credit limit) и долг (debt)
+  • Банк хранит историю всех транзакций (аудит/audit)
+  • При недостатке средств — отказ с исключением (InsufficientFundsException)
+  • Счёт может быть заблокирован (BLOCKED), активен (ACTIVE) или закрыт (CLOSED)
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 1: ОСНОВЫ JAVA (Basics)
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 1 — Hello World (файл: basics/Lesson01_HelloWorld.java)
+  [x] Написать первую программу с System.out.println
+  [x] Понять структуру класса (class, main метод)
+  [x] Комментарии: //, /* */, /** */ (JavaDoc)
+  [ ] ЗАДАНИЕ: Напиши программу, которая выводит твоё имя и город в несколько строк
+
+УРОК 2 — Переменные и типы данных (файл: basics/Lesson02_VariablesAndTypes.java)
+  [x] Примитивные типы: byte, short, int, long, float, double, char, boolean
+  [x] Размеры и диапазоны (MAX_VALUE, MIN_VALUE)
+  [x] Ключевое слово var (Java 10+, автовывод типа)
+  [x] Ключевое слово final (константы)
+  [x] Обёртки (Wrapper classes): Integer, Double, Long, Boolean
+  [x] Автоупаковка (Autoboxing) и распаковка (Unboxing)
+  [x] Приведение типов (casting): widening и narrowing
+  [ ] ЗАДАНИЕ: Объяви переменные для хранения данных клиента банка:
+        - имя клиента
+        - баланс счёта (используй BigDecimal!)
+        - возраст
+        - статус активности (boolean)
+        - номер счёта (String)
+
+УРОК 3 — Операторы (файл: basics/Lesson03_Operators.java)
+  [x] Арифметические: +, -, *, /, %, ++, --
+  [x] Сравнения: ==, !=, >, <, >=, <=
+  [x] Логические: &&, ||, !, & (non-short-circuit), |
+  [x] Побитовые: &, |, ^, ~, <<, >>, >>>
+  [x] Тернарный оператор: условие ? если_да : если_нет
+  [x] instanceof (проверка типа)
+  [x] Pattern matching instanceof (Java 16+)
+  [ ] ЗАДАНИЕ: Напиши метод, который проверяет:
+        - Достаточно ли средств на счёте для снятия
+        - Является ли сумма транзакции подозрительной (> 100_000 руб)
+
+УРОК 4 — Условия (файл: basics/Lesson04_ConditionsAndSwitch.java)
+  [x] if / else if / else
+  [x] Вложенные условия
+  [x] switch statement (классический)
+  [x] switch expression (Java 14+, с ->)
+  [x] switch с pattern matching (Java 17+)
+  [ ] ЗАДАНИЕ: Напиши метод определения категории клиента по балансу:
+        - до 10_000 — "Стандарт"
+        - 10_000 - 100_000 — "Серебро"
+        - 100_000 - 1_000_000 — "Золото"
+        - > 1_000_000 — "Премиум"
+
+УРОК 5 — Циклы (файл: basics/Lesson05_Loops.java)
+  [x] for (классический)
+  [x] while
+  [x] do-while
+  [x] for-each (enhanced for)
+  [x] break и continue
+  [x] Метки (labels) для вложенных циклов
+  [ ] ЗАДАНИЕ: Напиши программу, которая:
+        - Симулирует 12 месяцев начисления процентов на счёт
+        - Выводит баланс каждый месяц
+        - Останавливается если баланс превысил 1_000_000 руб
+
+УРОК 6 — Массивы (файл: basics/Lesson06_Arrays.java)
+  [x] Одномерные массивы: объявление, инициализация, доступ
+  [x] Многомерные массивы (2D)
+  [x] Зубчатые массивы (jagged arrays)
+  [x] Класс Arrays: sort, binarySearch, fill, copyOf, toString
+  [x] System.arraycopy
+  [ ] ЗАДАНИЕ: Создай массив из 10 транзакций (суммы рандомные)
+        - Найди максимальную и минимальную транзакцию
+        - Отсортируй массив
+        - Выведи все транзакции больше 5000 руб
+
+УРОК 7 — Строки (файл: basics/Lesson07_Strings.java)
+  [x] String — неизменяемость (immutability)
+  [x] Методы: length, charAt, substring, indexOf, contains, startsWith, endsWith
+  [x] Методы: toLowerCase, toUpperCase, trim, strip, replace, split, join
+  [x] equals vs == (важно!)
+  [x] StringBuilder — изменяемая строка, append, insert, delete, reverse
+  [x] StringJoiner, String.join
+  [x] String.format и printf
+  [x] Text Blocks / многострочные строки (Java 15+)
+  [x] Регулярные выражения (базово): matches, replaceAll с regex
+  [ ] ЗАДАНИЕ: Напиши метод форматирования номера счёта:
+        - Вход: "40817810000000000001"
+        - Выход: "4081 7810 0000 0000 0001" (группами по 4)
+
+УРОК 8 — Математика и числа (файл: basics/Lesson08_Math.java)
+  [x] Класс Math: abs, min, max, pow, sqrt, round, floor, ceil, random
+  [x] BigDecimal — точная арифметика (ОБЯЗАТЕЛЬНО для денег!)
+  [x] BigDecimal: scale, RoundingMode, compareTo
+  [x] Random и ThreadLocalRandom
+  [ ] ЗАДАНИЕ: Напиши метод расчёта сложных процентов:
+        - Формула: A = P * (1 + r/n)^(n*t)
+        - P = начальная сумма, r = годовая ставка, n = начислений в год, t = лет
+        - Используй BigDecimal для точного расчёта
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 2: ООП (Object-Oriented Programming)
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 9 — Классы и объекты (файл: oop/model/)
+  [x] Класс Account (абстрактный) — поля, конструкторы, методы
+  [x] Конструктор с параметрами, this(), super()
+  [x] Инкапсуляция: private поля, public методы (getters/setters)
+  [x] Класс Client с Builder паттерном
+  [x] toString(), equals(), hashCode() — переопределение
+  [ ] ЗАДАНИЕ: Добавь в класс Client:
+        - Поле passportNumber (String)
+        - Поле dateOfBirth (LocalDate)
+        - Метод getAge() который считает возраст по дате рождения
+        - Переопредели equals() по номеру паспорта
+
+УРОК 10 — Наследование (файл: oop/model/)
+  [x] abstract класс Account
+  [x] extends: DebitAccount, SavingsAccount, CreditAccount
+  [x] super — вызов метода/конструктора родителя
+  [x] @Override — переопределение методов
+  [x] final класс (запрет наследования)
+  [x] Цепочка наследования
+  [ ] ЗАДАНИЕ: Создай класс ChildSavingsAccount extends SavingsAccount:
+        - Ставка процента выше на 2%
+        - Снятие разрешено только при достижении 18 лет
+        - Добавь поле parentClientId
+
+УРОК 11 — Полиморфизм (файл: oop/model/)
+  [x] Переменная типа Account хранит SavingsAccount/CreditAccount
+  [x] Вызов переопределённых методов — динамическое связывание
+  [x] Приведение типов объектов: (SavingsAccount) account
+  [x] instanceof проверка перед приведением
+  [ ] ЗАДАНИЕ: Напиши метод processMonthlyInterest(List<Account>):
+        - Для каждого счёта в списке
+        - Если это SavingsAccount — начисли проценты
+        - Если это CreditAccount — начисли проценты на долг
+        - Используй instanceof и полиморфизм
+
+УРОК 12 — Интерфейсы (файл: oop/interfaces/)
+  [x] interface Transferable — transfer(), getBalance()
+  [x] interface Auditable — getTransactionHistory()
+  [x] Дефолтные методы (default methods, Java 8+)
+  [x] Статические методы в интерфейсах
+  [x] Множественная реализация интерфейсов
+  [x] Функциональные интерфейсы (@FunctionalInterface)
+  [ ] ЗАДАНИЕ: Создай интерфейс Printable:
+        - Метод printStatement() — выводит выписку по счёту
+        - Реализуй его в DebitAccount и SavingsAccount
+
+УРОК 13 — Абстрактные классы vs Интерфейсы
+  [x] Когда использовать abstract class (общее состояние + поведение)
+  [x] Когда использовать interface (контракт поведения)
+  [ ] ЗАДАНИЕ: Напиши сравнительную таблицу в комментарии к коду
+
+УРОК 14 — Перечисления (Enum) (файл: oop/enums/)
+  [x] enum TransactionType: DEPOSIT, WITHDRAWAL, TRANSFER, PAYMENT, FEE
+  [x] enum AccountStatus: ACTIVE, BLOCKED, CLOSED, FROZEN
+  [x] enum Currency: RUB, USD, EUR с полями и методами
+  [x] Enum методы: values(), valueOf(), ordinal(), name()
+  [x] Enum с конструктором и полями
+  [x] Enum в switch
+  [ ] ЗАДАНИЕ: Добавь enum CardType: VISA, MASTERCARD, MIR
+        - Поле: String networkName
+        - Поле: double cashbackPercent (Мир — 1%, Visa — 0.5%)
+        - Метод: calcCashback(BigDecimal amount)
+
+УРОК 15 — Исключения (файл: oop/exceptions/)
+  [x] try / catch / finally
+  [x] Множественный catch
+  [x] Multi-catch (catch (E1 | E2 e))
+  [x] try-with-resources (AutoCloseable)
+  [x] throws — объявление исключений
+  [x] Свои исключения: BankException, InsufficientFundsException, etc.
+  [x] Checked vs Unchecked исключения
+  [x] Цепочка исключений (cause)
+  [ ] ЗАДАНИЕ: Добавь исключение DailyLimitExceededException:
+        - Клиент не может снять больше 300_000 в день
+        - Храни счётчик дневных снятий в Account
+        - Выброси исключение при превышении
+
+УРОК 16 — Вложенные классы
+  [ ] Статические вложенные классы (static nested class)
+  [ ] Внутренние классы (inner class)
+  [ ] Локальные классы (local class)
+  [ ] Анонимные классы (anonymous class)
+  [ ] ЗАДАНИЕ: В классе Transaction создай вложенный класс Builder
+
+УРОК 17 — Generics (файл: generics/)
+  [x] Generic класс Repository<T>
+  [x] Generic метод
+  [x] Ограниченные параметры: <T extends Account>
+  [x] Wildcard: <?>, <? extends T>, <? super T>
+  [x] Type erasure — что происходит в рантайме
+  [ ] ЗАДАНИЕ: Создай класс Pair<A, B> который хранит два связанных объекта
+        - Используй его для хранения пары (Client, List<Account>)
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 3: КОЛЛЕКЦИИ (Collections Framework)
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 18 — Коллекции (файл: collections/CollectionsLesson.java)
+  [x] List: ArrayList vs LinkedList — когда что использовать
+  [x] Set: HashSet, LinkedHashSet, TreeSet
+  [x] Map: HashMap, LinkedHashMap, TreeMap, EnumMap
+  [x] Queue: ArrayDeque, PriorityQueue
+  [x] Stack (используй Deque вместо Stack!)
+  [x] Collections utility class: sort, shuffle, min, max, frequency
+  [x] Unmodifiable коллекции: List.of(), Map.of(), Collections.unmodifiableList()
+
+УРОК 19 — Итераторы (Iterator и Iterable)
+  [x] Iterator: hasNext(), next(), remove()
+  [x] ListIterator: предыдущий элемент, добавление
+  [x] Реализация Iterable в своём классе (Bank implements Iterable<Client>)
+  [ ] ЗАДАНИЕ: Реализуй Iterator для класса TransactionHistory
+        - Итерируй транзакции от самой новой к самой старой
+
+УРОК 20 — Comparator и Comparable
+  [x] Comparable<T>: compareTo() в классе Account (сортировка по балансу)
+  [x] Comparator<T>: лямбда-компараторы
+  [x] Comparator.comparing, thenComparing, reversed
+  [x] Сортировка клиентов по имени, по балансу, по дате регистрации
+  [ ] ЗАДАНИЕ: Отсортируй список транзакций по:
+        - Дате (новые первые)
+        - Сумме (убывание)
+        - Типу транзакции (алфавитный порядок)
+        Используй Comparator.comparing().thenComparing()
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 4: ФУНКЦИОНАЛЬНОЕ ПРОГРАММИРОВАНИЕ (Java 8+)
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 21 — Лямбды и функциональные интерфейсы (файл: functional/)
+  [x] Lambda синтаксис: (params) -> expression
+  [x] Функциональные интерфейсы: Function<T,R>, Predicate<T>, Consumer<T>, Supplier<T>
+  [x] BiFunction, BiPredicate, BiConsumer
+  [x] UnaryOperator, BinaryOperator
+  [x] Ссылки на методы: Class::method, obj::method, Class::new
+  [ ] ЗАДАНИЕ: Напиши метод filterClients(List<Client>, Predicate<Client>)
+        - Используй его для фильтрации по статусу, балансу, имени
+
+УРОК 22 — Stream API
+  [x] Создание стримов: stream(), of(), generate(), iterate()
+  [x] Промежуточные операции: filter, map, flatMap, distinct, sorted, limit, skip
+  [x] Терминальные операции: collect, forEach, reduce, count, sum, min, max
+  [x] Collectors: toList, toSet, toMap, groupingBy, joining, counting, summingInt
+  [x] Параллельные стримы: parallelStream() (осторожно!)
+  [x] OptionalDouble, OptionalInt, OptionalLong
+  [ ] ЗАДАНИЕ: Используя Stream API:
+        - Найди общую сумму всех DEPOSIT транзакций за последний месяц
+        - Сгруппируй клиентов по категории (Стандарт/Серебро/Золото/Премиум)
+        - Найди клиента с максимальным балансом
+        - Получи список уникальных валют всех счетов
+
+УРОК 23 — Optional
+  [x] Optional.of(), Optional.ofNullable(), Optional.empty()
+  [x] isPresent(), isEmpty(), get(), orElse(), orElseGet(), orElseThrow()
+  [x] map(), flatMap(), filter()
+  [ ] ЗАДАНИЕ: Перепиши метод findClientById(String id) так чтобы он возвращал Optional<Client>
+        - Используй orElseThrow для выброса AccountNotFoundException
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 5: АЛГОРИТМЫ И СТРУКТУРЫ ДАННЫХ
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 24 — Алгоритмы сортировки (файл: algorithms/SortingAlgorithms.java)
+  [x] Bubble Sort O(n²) — пузырьковая сортировка
+  [x] Selection Sort O(n²) — сортировка выбором
+  [x] Insertion Sort O(n²) — сортировка вставками
+  [x] Merge Sort O(n log n) — сортировка слиянием
+  [x] Quick Sort O(n log n) средний, O(n²) худший — быстрая сортировка
+  [ ] ЗАДАНИЕ: Добавь Heap Sort (сортировку кучей)
+  [ ] ЗАДАНИЕ: Сравни время работы всех сортировок на массиве из 10_000 элементов
+
+УРОК 25 — Алгоритмы поиска
+  [x] Linear Search O(n) — линейный поиск
+  [x] Binary Search O(log n) — бинарный поиск (массив должен быть отсортирован!)
+  [ ] ЗАДАНИЕ: Реализуй поиск клиента по балансу (в диапазоне от-до)
+
+УРОК 26 — Структуры данных (файл: algorithms/DataStructures.java)
+  [x] Linked List (односвязный список) — своя реализация
+  [x] Stack на массиве — push, pop, peek
+  [x] Queue на массиве (кольцевой буфер) — enqueue, dequeue
+  [x] Binary Search Tree — insert, search, inorder traversal
+  [ ] ЗАДАНИЕ: Реализуй двусвязный список (DoublyLinkedList)
+  [ ] ЗАДАНИЕ: Реализуй HashMap своими руками (хеш-таблица с цепочками)
+  [ ] ЗАДАНИЕ: Реализуй Min-Heap (минимальная куча)
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 6: ПАТТЕРНЫ ПРОЕКТИРОВАНИЯ (Design Patterns)
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 27 — Паттерны (файл: patterns/)
+  [x] Singleton — единственный экземпляр BankRegistry (потокобезопасный)
+  [x] Builder — создание Client через Builder
+  [x] Factory Method — создание Account через AccountFactory
+  [x] Observer — уведомления о транзакциях (TransactionObserver)
+  [x] Strategy — стратегии начисления процентов (InterestStrategy)
+  [ ] ЗАДАНИЕ: Реализуй паттерн Decorator:
+        - BaseAccount -> LoggingAccount (логирует все операции) -> SecuredAccount (шифрует данные)
+  [ ] ЗАДАНИЕ: Реализуй паттерн Command:
+        - DepositCommand, WithdrawCommand, TransferCommand
+        - CommandHistory для отмены операций (undo)
+  [ ] ЗАДАНИЕ: Реализуй паттерн Proxy:
+        - Проксирующий счёт проверяет лимиты перед каждой операцией
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 7: МНОГОПОТОЧНОСТЬ (Multithreading)
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 28 — Основы многопоточности
+  [ ] Thread класс: создание, start(), run()
+  [ ] Runnable interface
+  [ ] sleep(), join(), interrupt()
+  [ ] ЗАДАНИЕ: Создай 3 потока, каждый обрабатывает транзакции разных клиентов
+
+УРОК 29 — Синхронизация
+  [ ] synchronized метод и блок
+  [ ] volatile переменная
+  [ ] Проблемы: Race Condition, Deadlock
+  [ ] ЗАДАНИЕ: Сделай метод transfer() потокобезопасным с synchronized
+  [ ] ЗАДАНИЕ: Воспроизведи и исправь race condition при параллельных переводах
+
+УРОК 30 — Java Concurrency API
+  [ ] ExecutorService, ThreadPoolExecutor
+  [ ] Future<T>, Callable<T>
+  [ ] CompletableFuture: thenApply, thenCompose, allOf, anyOf
+  [ ] AtomicInteger, AtomicLong (для счётчиков транзакций)
+  [ ] ReentrantLock, ReadWriteLock
+  [ ] ConcurrentHashMap для кеша клиентов
+  [ ] ЗАДАНИЕ: Обработай 1000 транзакций параллельно с пулом из 4 потоков
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 8: I/O, СЕРИАЛИЗАЦИЯ, РАБОТА С ФАЙЛАМИ
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 31 — Работа с файлами
+  [ ] File, Path, Files (NIO)
+  [ ] Чтение: FileReader, BufferedReader, Files.readAllLines()
+  [ ] Запись: FileWriter, BufferedWriter, Files.write()
+  [ ] ЗАДАНИЕ: Сохраняй историю транзакций в CSV файл
+        - Формат: дата,тип,сумма,откуда,куда
+  [ ] ЗАДАНИЕ: Загружай список клиентов из файла при старте приложения
+
+УРОК 32 — Сериализация
+  [ ] Serializable interface
+  [ ] ObjectInputStream, ObjectOutputStream
+  [ ] transient поля
+  [ ] ЗАДАНИЕ: Сериализуй объект Client в файл и десериализуй обратно
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 9: ТЕСТИРОВАНИЕ (Testing)
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 33 — JUnit 5
+  [ ] @Test, @BeforeEach, @AfterEach, @BeforeAll, @AfterAll
+  [ ] Assertions: assertEquals, assertThrows, assertNotNull, assertTrue
+  [ ] @ParameterizedTest, @ValueSource, @CsvSource
+  [ ] ЗАДАНИЕ: Напиши тесты для Account:
+        - deposit успешный
+        - withdraw при недостатке средств — ожидаем InsufficientFundsException
+        - transfer между счетами
+        - начисление процентов на SavingsAccount
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 10: SPRING BOOT (файл: spring/)
+══════════════════════════════════════════════════════════════════════════════════
+
+ШАГ 1 — Настройка Spring Boot
+  [ ] Раскомментируй зависимости в pom.xml
+  [ ] Создай BankApplication.java с @SpringBootApplication
+  [ ] Настрой application.properties (порт, БД)
+  [ ] Запусти приложение: mvn spring-boot:run
+
+ШАГ 2 — REST Controller
+  [ ] @RestController, @RequestMapping
+  [ ] @GetMapping, @PostMapping, @PutMapping, @DeleteMapping
+  [ ] @PathVariable, @RequestParam, @RequestBody
+  [ ] ResponseEntity<T>
+  [ ] ЗАДАНИЕ: AccountController:
+        - GET /api/accounts — все счета
+        - GET /api/accounts/{id} — счёт по ID
+        - POST /api/accounts — создать счёт
+        - PUT /api/accounts/{id}/deposit — пополнить
+        - PUT /api/accounts/{id}/withdraw — снять
+        - POST /api/accounts/transfer — перевод
+
+ШАГ 3 — Service Layer
+  [ ] @Service, @Transactional
+  [ ] Разделение бизнес-логики и контроллера
+  [ ] ЗАДАНИЕ: AccountService с методами бизнес-логики
+
+ШАГ 4 — Repository (JPA)
+  [ ] @Entity, @Id, @GeneratedValue, @Column
+  [ ] @OneToMany, @ManyToOne, @ManyToMany
+  [ ] JpaRepository<T, ID>
+  [ ] @Query — кастомные JPQL запросы
+  [ ] ЗАДАНИЕ: AccountEntity, ClientEntity, TransactionEntity
+  [ ] ЗАДАНИЕ: findByClientId, findByStatusAndBalanceGreaterThan
+
+ШАГ 5 — Dependency Injection
+  [ ] @Autowired (через конструктор — лучшая практика!)
+  [ ] @Component, @Service, @Repository, @Controller
+  [ ] @Bean, @Configuration
+  [ ] @Qualifier — выбор конкретной реализации
+
+ШАГ 6 — Валидация
+  [ ] @Valid, @NotNull, @NotBlank, @Min, @Max, @Size, @Email
+  [ ] BindingResult для обработки ошибок валидации
+  [ ] @ExceptionHandler, @ControllerAdvice для глобальной обработки ошибок
+
+ШАГ 7 — Безопасность (Spring Security)
+  [ ] @EnableWebSecurity
+  [ ] Базовая HTTP аутентификация
+  [ ] JWT токены (advanced)
+  [ ] @PreAuthorize, @Secured
+
+══════════════════════════════════════════════════════════════════════════════════
+  ЭТАП 11: ПРОДВИНУТЫЕ ТЕМЫ
+══════════════════════════════════════════════════════════════════════════════════
+
+УРОК 34 — Рефлексия (Reflection)
+  [ ] Class<?> clazz = obj.getClass()
+  [ ] getDeclaredFields(), getDeclaredMethods()
+  [ ] Аннотации — создание своих аннотаций
+  [ ] ЗАДАНИЕ: Создай аннотацию @Audited и обработчик, который логирует вызовы помеченных методов
+
+УРОК 35 — Java Time API (java.time)
+  [ ] LocalDate, LocalTime, LocalDateTime
+  [ ] ZonedDateTime, Instant
+  [ ] Duration, Period
+  [ ] DateTimeFormatter
+  [ ] ЗАДАНИЕ: Добавь в Transaction поле LocalDateTime timestamp
+        - Выводи дату в формате "dd.MM.yyyy HH:mm:ss"
+        - Фильтруй транзакции за последние 30 дней
+
+УРОК 36 — Records (Java 16+)
+  [ ] record Transaction(String id, BigDecimal amount, TransactionType type, LocalDateTime timestamp)
+  [ ] Компактный конструктор
+  [ ] ЗАДАНИЕ: Перепиши класс Transaction как record
+
+УРОК 37 — Sealed Classes (Java 17+)
+  [ ] sealed interface AccountEvent permits DepositEvent, WithdrawEvent, TransferEvent
+  [ ] ЗАДАНИЕ: Реализуй Event систему для банка с sealed classes и pattern matching
+
+УРОК 38 — Работа с базами данных (JDBC)
+  [ ] DriverManager, Connection, Statement, PreparedStatement
+  [ ] ResultSet
+  [ ] Connection Pool (HikariCP)
+  [ ] ЗАДАНИЕ: Сохраняй транзакции в H2 без Spring, только JDBC
+
+══════════════════════════════════════════════════════════════════════════════════
+  ФИНАЛЬНЫЙ ПРОЕКТ
+══════════════════════════════════════════════════════════════════════════════════
+
+  [ ] Полноценное Spring Boot REST API для банка
+  [ ] Клиенты, счета, транзакции — в базе данных
+  [ ] JWT аутентификация
+  [ ] Валидация запросов
+  [ ] Обработка ошибок (GlobalExceptionHandler)
+  [ ] JUnit тесты (покрытие > 80%)
+  [ ] Swagger/OpenAPI документация
+  [ ] Docker контейнеризация
+  [ ] Postman коллекция для тестирования API
+
+══════════════════════════════════════════════════════════════════════════════════
+  ПОЛЕЗНЫЕ КОМАНДЫ
+══════════════════════════════════════════════════════════════════════════════════
+
+Компиляция:      mvn compile
+Запуск тестов:   mvn test
+Запуск проекта:  mvn exec:java -Dexec.mainClass="com.bank.Main"
+  или:           mvn package && java -jar target/java-bank-study-1.0.0.jar
+Spring Boot:     mvn spring-boot:run
+
+══════════════════════════════════════════════════════════════════════════════════
+  СТРУКТУРА ПРОЕКТА
+══════════════════════════════════════════════════════════════════════════════════
+
+src/main/java/com/bank/
+├── Main.java                          ← Точка входа, запускает примеры
+├── basics/
+│   ├── Lesson01_HelloWorld.java       [x] Выполнено
+│   ├── Lesson02_VariablesAndTypes.java[x] Выполнено
+│   ├── Lesson03_Operators.java        [x] Выполнено
+│   ├── Lesson04_ConditionsAndSwitch.java [x] Выполнено
+│   ├── Lesson05_Loops.java            [x] Выполнено
+│   ├── Lesson06_Arrays.java           [x] Выполнено
+│   ├── Lesson07_Strings.java          [x] Выполнено
+│   └── Lesson08_Math.java             [x] Выполнено
+├── oop/
+│   ├── enums/
+│   │   ├── TransactionType.java       [x] Выполнено
+│   │   ├── AccountStatus.java         [x] Выполнено
+│   │   └── Currency.java              [x] Выполнено
+│   ├── exceptions/
+│   │   ├── BankException.java         [x] Выполнено
+│   │   ├── InsufficientFundsException.java [x] Выполнено
+│   │   ├── AccountNotFoundException.java   [x] Выполнено
+│   │   └── AccountBlockedException.java    [x] Выполнено
+│   ├── interfaces/
+│   │   ├── Transferable.java          [x] Выполнено
+│   │   └── Auditable.java             [x] Выполнено
+│   └── model/
+│       ├── Account.java               [x] Выполнено (абстрактный)
+│       ├── DebitAccount.java          [x] Выполнено
+│       ├── SavingsAccount.java        [x] Выполнено
+│       ├── CreditAccount.java         [x] Выполнено
+│       ├── Transaction.java           [x] Выполнено
+│       ├── Client.java                [x] Выполнено (с Builder)
+│       └── Bank.java                  [x] Выполнено
+├── collections/
+│   └── CollectionsLesson.java         [x] Выполнено
+├── generics/
+│   └── GenericRepository.java         [x] Выполнено
+├── functional/
+│   └── StreamsAndLambdas.java         [x] Выполнено
+├── algorithms/
+│   ├── SortingAlgorithms.java         [x] Выполнено (BubbleSort→HeapSort + сравнение)
+│   ├── graphs/
+│   │   └── GraphAlgorithms.java       [x] BFS, DFS, Dijkstra, Floyd-Warshall, MST
+│   ├── recursion/
+│   │   └── RecursionClassics.java     [x] Ханой, Fibonacci, Factorial, Subset, Permut.
+│   └── complexity/                    [x] НОВЫЙ РАЗДЕЛ — папка по сложностям
+│       ├── O1_Constant.java           [x] O(1) — HashMap, массив по индексу
+│       ├── OLogN_Logarithmic.java     [x] O(log n) — бинарный поиск, степень
+│       ├── ON_Linear.java             [x] O(n) — линейный поиск, sliding window
+│       ├── ONLogN_Linearithmic.java   [x] O(n log n) — merge sort, inversions
+│       ├── ON2_Quadratic.java         [x] O(n²) — bubble sort, all pairs
+│       └── O2N_Exponential.java       [x] O(2^n) — subsets, TSP, permutations
+├── datastructures/                    [x] НОВЫЙ РАЗДЕЛ
+│   ├── StackImpl.java                 [x] Стек: массив + связный список + задачи
+│   ├── QueueImpl.java                 [x] Очередь: кольцевая, linked, Priority, Rate Limiter
+│   ├── DequeAndLinkedListImpl.java    [x] Дек + DoublyLinkedList + LRU Cache
+│   └── HashMapAndHeapImpl.java        [x] HashMap (своя реализация) + MinHeap
+├── patterns/
+│   └── PatternsDemo.java              [x] Выполнено
+└── spring/                            [ ] TODO — весь раздел
+    ├── BankApplication.java           [ ] Заглушка — раскомментируй когда готов
+    ├── controller/AccountController.java [ ] TODO
+    ├── service/AccountService.java    [ ] TODO
+    ├── repository/AccountRepository.java [ ] TODO
+    └── entity/AccountEntity.java      [ ] TODO
+
+══════════════════════════════════════════════════════════════════════════════════
+  ОБРАЗОВАТЕЛЬНЫЕ МАТЕРИАЛЫ (.txt файлы в корне проекта)
+══════════════════════════════════════════════════════════════════════════════════
+
+LEARN_OOP.txt                      [x] ООП, 4 столпа, SOLID, паттерны, ошибки
+LEARN_SECURITY_AND_NETWORKS.txt    [x] HTTP/HTTPS, JWT, OAuth, OWASP Top 10, шифрование
+LEARN_MICROSERVICES_VS_MONOLITH.txt[x] Монолит vs микросервисы, Kafka, Docker, K8s
+LEARN_FRAMEWORKS_SPRING.txt        [x] Spring Boot, JPA, Security, REST лучшие практики
+LEARN_API_AND_DATABASES.txt        [x] REST/gRPC/GraphQL, PostgreSQL, Redis, CAP теорема
+LEARN_BACKEND_CAREER.txt           [x] Карьерный путь, что реально делают в банке,
+                                       собеседования, план обучения

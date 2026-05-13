@@ -1,0 +1,515 @@
+================================================================================
+  DOCKER + KUBERNETES — ВСЕ КОМАНДЫ И СЦЕНАРИИ РАБОТЫ
+================================================================================
+
+"Не зубри команды — пойми задачу. Как перейти из А в Б.
+ Команды запомнятся сами в процессе работы."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 1: DOCKER — ПОЛНЫЙ СПРАВОЧНИК
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+═══ ОБРАЗЫ (docker image) ═══════════════════════════════════════════════════════
+
+  docker pull nginx:alpine               # Скачать образ
+  docker images                          # Список образов (короткий)
+  docker image ls                        # То же самое
+  docker image ls -a                     # Включая промежуточные
+  docker image inspect nginx             # JSON с деталями
+  docker image history nginx             # История слоёв
+  docker rmi nginx:alpine                # Удалить образ
+  docker image rm $(docker images -q)    # Удалить ВСЕ образы
+  docker image prune                     # Удалить dangling (без тега)
+  docker image prune -a                  # Удалить все неиспользуемые
+  docker tag myapp:latest registry/myapp:v1.0   # Переименовать/добавить тег
+
+  # Сборка:
+  docker build -t myapp:latest .                        # Собрать из текущей папки
+  docker build -t myapp:latest -f Dockerfile.prod .    # Конкретный Dockerfile
+  docker build -t myapp:latest --no-cache .            # Без кеша
+  docker build -t myapp:latest --build-arg ENV=prod .  # Передать ARG
+  docker build --platform linux/amd64 -t myapp .       # Для другой платформы (ARM → AMD)
+  docker buildx build --platform linux/amd64,linux/arm64 -t myapp . --push  # Мультиплатформа
+
+  # Registry:
+  docker login registry.gitlab.com -u user -p token
+  docker push registry.gitlab.com/bank/app:v1.0
+  docker pull registry.gitlab.com/bank/app:v1.0
+  docker logout
+
+  # Экспорт/импорт образа (без registry, через файл):
+  docker save myapp:latest > myapp.tar
+  docker load < myapp.tar
+  docker save myapp:latest | gzip > myapp.tar.gz
+  docker load < myapp.tar.gz
+
+═══ КОНТЕЙНЕРЫ (docker container) ══════════════════════════════════════════════
+
+  # Запуск:
+  docker run nginx                           # Запустить (foreground)
+  docker run -d nginx                        # Detached (фоновый)
+  docker run --name web nginx                # С именем
+  docker run -p 8080:80 nginx               # Пробросить порт (host:container)
+  docker run -p 127.0.0.1:8080:80 nginx    # Только localhost (безопасно!)
+  docker run -e ENV_VAR=value nginx         # Переменная окружения
+  docker run --env-file .env nginx          # Из файла
+  docker run -v /host/path:/container/path nginx   # Bind mount
+  docker run -v myvolume:/data nginx        # Named volume
+  docker run -v $(pwd):/app nginx           # Текущая папка
+  docker run --rm nginx                     # Удалить после остановки
+  docker run -it ubuntu bash                # Интерактивный режим (bash)
+  docker run --network mynet nginx          # Подключить к сети
+  docker run --memory 512m --cpus 0.5 nginx    # Ограничение ресурсов
+  docker run --restart unless-stopped nginx    # Автоперезапуск
+  docker run --restart on-failure:3 nginx      # Перезапустить 3 раза при ошибке
+  docker run --user 1000:1000 nginx        # Запустить от другого пользователя
+  docker run --read-only nginx             # Только чтение filesystem (безопасно!)
+  docker run --cap-drop ALL --cap-add NET_BIND_SERVICE nginx  # Минимум привилегий
+
+  # Управление:
+  docker ps                              # Запущенные контейнеры
+  docker ps -a                           # Все (включая остановленные)
+  docker ps -q                           # Только ID (для скриптов)
+  docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+  docker start container_name            # Запустить остановленный
+  docker stop container_name             # Остановить (SIGTERM, 10s timeout)
+  docker stop -t 30 container_name       # Дать 30 секунд на shutdown
+  docker kill container_name             # Убить сразу (SIGKILL)
+  docker restart container_name          # Перезапустить
+  docker pause container_name            # Заморозить (SIGSTOP)
+  docker unpause container_name          # Разморозить
+  docker rm container_name               # Удалить (должен быть остановлен)
+  docker rm -f container_name            # Удалить принудительно (force)
+  docker rm $(docker ps -aq)             # Удалить все остановленные
+  docker container prune                 # Удалить все остановленные
+
+  # Логи:
+  docker logs container_name             # Все логи
+  docker logs -f container_name          # Follow (streaming)
+  docker logs --tail 100 container_name  # Последние 100 строк
+  docker logs --since 1h container_name  # За последний час
+  docker logs --since "2024-01-15T10:00:00" container_name
+  docker logs --timestamps container_name  # С временными метками
+
+  # Inspect и статистика:
+  docker inspect container_name          # Полная инфо (JSON)
+  docker inspect -f '{{.State.Pid}}' container_name  # Go template
+  docker stats                           # CPU/Memory в реальном времени
+  docker stats --no-stream               # Один снимок
+  docker top container_name             # Процессы внутри
+  docker port container_name            # Пробросы портов
+  docker diff container_name            # Изменения в файловой системе
+
+  # Вход в контейнер:
+  docker exec -it container_name bash    # Интерактивный bash
+  docker exec -it container_name sh      # sh (если нет bash, alpine)
+  docker exec container_name ls /app     # Не интерактивно
+  docker exec -u root container_name bash  # От root (если запущен не root)
+  docker attach container_name           # Подключиться к stdout/stdin (осторожно!)
+
+  # Копирование файлов:
+  docker cp file.txt container_name:/app/   # Host → Container
+  docker cp container_name:/app/log.txt ./  # Container → Host
+
+═══ СЕТИ (docker network) ═══════════════════════════════════════════════════════
+
+  docker network ls                      # Список сетей
+  docker network inspect bridge          # Детали сети
+  docker network create mynet            # Создать bridge сеть
+  docker network create --driver overlay mynet    # Overlay (Swarm)
+  docker network create --subnet 172.20.0.0/16 mynet  # Своя подсеть
+  docker network connect mynet container_name     # Подключить контейнер
+  docker network disconnect mynet container_name  # Отключить
+  docker network rm mynet                # Удалить
+
+  # ТИПЫ СЕТЕЙ:
+  bridge   — изолированная сеть на хосте (по умолчанию)
+  host     — контейнер использует сеть хоста напрямую (нет изоляции)
+  none     — нет сети
+  overlay  — для Docker Swarm (несколько хостов)
+
+  # Контейнеры в одной сети видят друг друга по имени:
+  docker network create bank-net
+  docker run -d --name postgres --network bank-net postgres:15
+  docker run -d --name app --network bank-net myapp
+  # app может подключиться: jdbc:postgresql://postgres:5432/db  ✓
+
+═══ ТОМА (docker volume) ════════════════════════════════════════════════════════
+
+  docker volume ls                       # Список
+  docker volume create mydata            # Создать
+  docker volume inspect mydata           # Детали (где хранится)
+  docker volume rm mydata                # Удалить
+  docker volume prune                    # Удалить неиспользуемые
+
+  # Типы хранилища:
+  -v /host/path:/container/path  # Bind mount (конкретная папка хоста)
+  -v volume_name:/container/path # Named volume (управляет Docker)
+  --mount type=tmpfs,dst=/tmp    # tmpfs (только RAM, для секретов)
+
+═══ DOCKER COMPOSE ══════════════════════════════════════════════════════════════
+
+  docker-compose up                      # Запустить (foreground)
+  docker-compose up -d                   # Detached
+  docker-compose up --build             # Пересобрать образы
+  docker-compose up -d service_name     # Только один сервис
+  docker-compose down                   # Остановить + удалить контейнеры
+  docker-compose down -v                # + удалить volumes
+  docker-compose down --rmi all         # + удалить образы
+  docker-compose stop                   # Только остановить
+  docker-compose start                  # Запустить остановленные
+  docker-compose restart service_name   # Перезапустить
+  docker-compose ps                     # Статус сервисов
+  docker-compose logs -f                # Логи всех сервисов
+  docker-compose logs -f app            # Логи одного сервиса
+  docker-compose exec app sh            # Войти в сервис
+  docker-compose run --rm app mvn test  # Запустить разовую команду
+  docker-compose build                  # Собрать образы
+  docker-compose pull                   # Обновить образы
+  docker-compose config                 # Проверить yaml на ошибки
+  docker-compose scale app=3            # Масштабировать (deprecated → --scale)
+  docker-compose up -d --scale app=3   # Запустить 3 инстанса
+
+═══ ОЧИСТКА ══════════════════════════════════════════════════════════════════
+
+  docker system df                       # Сколько места занято
+  docker system prune                    # Удалить всё неиспользуемое
+  docker system prune -a                 # Включая образы без тегов
+  docker system prune -a --volumes       # И тома тоже
+  # ОСТОРОЖНО с --volumes на production!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 2: KUBERNETES — ПОЛНЫЙ СПРАВОЧНИК
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+═══ KUBECTL КОНФИГУРАЦИЯ ════════════════════════════════════════════════════════
+
+  kubectl version                              # Версии client + server
+  kubectl config view                          # Текущий kubeconfig
+  kubectl config get-contexts                  # Список кластеров
+  kubectl config current-context               # Текущий кластер
+  kubectl config use-context prod-cluster      # Переключить кластер
+  kubectl config set-context --current --namespace=banking  # Namespace по умолчанию
+  # Теперь не нужно -n banking в каждой команде!
+
+  # kubectx + kubens (удобные утилиты):
+  kubectx prod-cluster     # Переключить кластер
+  kubens banking           # Переключить namespace
+
+═══ GET — ПРОСМОТР РЕСУРСОВ ════════════════════════════════════════════════════
+
+  # Pods:
+  kubectl get pods                              # В текущем namespace
+  kubectl get pods -n banking                   # В конкретном namespace
+  kubectl get pods -A                           # Во всех namespace
+  kubectl get pods -w                           # Watch (обновляется)
+  kubectl get pods -o wide                      # + IP и нода
+  kubectl get pods -o yaml                      # Полный YAML
+  kubectl get pods -o json                      # JSON
+  kubectl get pods -l app=bank-app              # По лейблу
+  kubectl get pods --field-selector=status.phase=Running
+
+  # Все ресурсы:
+  kubectl get all -n banking                    # Pods, Svc, Deployments...
+  kubectl get deploy,svc,pod -n banking         # Конкретные типы
+  kubectl get nodes                             # Ноды кластера
+  kubectl get nodes -o wide                     # + OS, kernel, container runtime
+  kubectl get namespaces                        # Все namespace
+  kubectl get events -n banking                 # События (хорошо для дебага!)
+  kubectl get events --sort-by='.lastTimestamp' # Сортировка по времени
+  kubectl get pv                               # PersistentVolumes
+  kubectl get pvc -n banking                   # PersistentVolumeClaims
+  kubectl get configmap -n banking             # ConfigMaps
+  kubectl get secret -n banking                # Secrets
+  kubectl get ingress -n banking               # Ingress
+  kubectl get hpa -n banking                   # HorizontalPodAutoscalers
+  kubectl get endpoints -n banking             # Endpoints (IP Podов у сервиса)
+
+═══ DESCRIBE — ДЕТАЛИ И ДЕБАГ ══════════════════════════════════════════════════
+
+  kubectl describe pod bank-app-xyz -n banking  # ОЧЕНЬ полезно для дебага!
+  # Показывает: Events, контейнеры, volumes, условия (Conditions)
+  # Events показывают: OOMKilled, ImagePullBackOff, CrashLoopBackOff причины!
+
+  kubectl describe node worker-1               # Состояние ноды, ресурсы
+  kubectl describe svc bank-app-service -n banking
+  kubectl describe deploy bank-app -n banking
+
+═══ ЛОГИ ════════════════════════════════════════════════════════════════════════
+
+  kubectl logs bank-app-xyz -n banking              # Логи пода
+  kubectl logs bank-app-xyz -n banking -f           # Follow
+  kubectl logs bank-app-xyz -n banking --tail=200   # Последние 200 строк
+  kubectl logs bank-app-xyz -n banking --previous   # Предыдущий запуск (если упал)
+  kubectl logs -l app=bank-app -n banking           # Все поды с лейблом
+  kubectl logs -l app=bank-app -n banking --prefix  # С именем пода в каждой строке
+  kubectl logs deploy/bank-app -n banking           # Логи всего deployment
+
+  # Multi-container pod — указать контейнер:
+  kubectl logs bank-app-xyz -c bank-app -n banking
+  kubectl logs bank-app-xyz -c envoy-sidecar -n banking
+
+  # Stern — удобный агрегатор логов (установить отдельно):
+  stern bank-app -n banking            # Логи всех подов bank-app
+  stern bank-app -n banking --since 1h
+
+═══ EXEC И PORT-FORWARD ═════════════════════════════════════════════════════════
+
+  kubectl exec -it bank-app-xyz -n banking -- bash         # Войти
+  kubectl exec -it bank-app-xyz -n banking -- sh           # Alpine
+  kubectl exec bank-app-xyz -n banking -- env              # Переменные окружения
+  kubectl exec bank-app-xyz -n banking -- cat /app/config  # Читать файл
+  kubectl exec bank-app-xyz -n banking -- curl localhost:8080/health  # Curl
+
+  # Port forward (для дебага, не для production!):
+  kubectl port-forward pod/bank-app-xyz 8080:8080 -n banking
+  kubectl port-forward svc/bank-app-service 8080:80 -n banking
+  kubectl port-forward svc/postgres 5433:5432 -n banking
+  kubectl port-forward deploy/bank-app 8080:8080 -n banking
+
+═══ APPLY И CREATE ══════════════════════════════════════════════════════════════
+
+  kubectl apply -f deployment.yaml              # Создать/обновить из файла
+  kubectl apply -f ./k8s/                       # Все файлы в директории
+  kubectl apply -f ./k8s/ --recursive           # Рекурсивно
+  kubectl apply -k ./kustomize/                 # Kustomize
+  kubectl create -f pod.yaml                    # Только создать (если уже есть — ошибка)
+  kubectl replace -f deployment.yaml            # Заменить (нужен полный YAML)
+  kubectl delete -f deployment.yaml             # Удалить из файла
+
+  # Создать из командной строки (для быстрого теста):
+  kubectl create deployment test-nginx --image=nginx --replicas=2
+  kubectl create service clusterip test-nginx --tcp=80:80
+  kubectl create configmap app-config --from-literal=ENV=prod --from-file=config.yaml
+  kubectl create secret generic db-secret --from-literal=password=mysecret
+
+  # Сгенерировать YAML без применения:
+  kubectl create deployment test --image=nginx --dry-run=client -o yaml > deploy.yaml
+
+═══ ОБНОВЛЕНИЕ И ОТКАТ ══════════════════════════════════════════════════════════
+
+  # Обновить образ:
+  kubectl set image deployment/bank-app bank-app=registry/bank-app:v1.2 -n banking
+  kubectl set image deployment/bank-app bank-app=registry/bank-app:v1.2 --record  # устарело
+
+  # Аннотация для записи причины обновления:
+  kubectl annotate deployment bank-app kubernetes.io/change-cause="Release v1.2 BANK-456" -n banking
+
+  # Следить за rollout:
+  kubectl rollout status deployment/bank-app -n banking
+  # Ожидает пока все поды не станут Ready
+
+  # История:
+  kubectl rollout history deployment/bank-app -n banking
+  kubectl rollout history deployment/bank-app --revision=2 -n banking  # Детали ревизии
+
+  # Откат:
+  kubectl rollout undo deployment/bank-app -n banking              # На предыдущую
+  kubectl rollout undo deployment/bank-app --to-revision=2 -n banking  # На конкретную
+
+  # Пауза/продолжение rollout:
+  kubectl rollout pause deployment/bank-app -n banking    # Остановить обновление
+  kubectl rollout resume deployment/bank-app -n banking   # Продолжить
+
+  # Перезапустить все поды (rolling restart):
+  kubectl rollout restart deployment/bank-app -n banking
+
+═══ МАСШТАБИРОВАНИЕ ═════════════════════════════════════════════════════════════
+
+  kubectl scale deployment bank-app --replicas=5 -n banking
+  kubectl scale deployment bank-app --replicas=0 -n banking  # Остановить все поды
+  kubectl autoscale deployment bank-app --min=3 --max=10 --cpu-percent=70 -n banking
+
+═══ УДАЛЕНИЕ ════════════════════════════════════════════════════════════════════
+
+  kubectl delete pod bank-app-xyz -n banking              # Удалить под (будет создан новый!)
+  kubectl delete deployment bank-app -n banking           # Удалить deployment
+  kubectl delete -f deployment.yaml                       # Из файла
+  kubectl delete pod -l app=bank-app -n banking           # По лейблу
+  kubectl delete all -l app=bank-app -n banking           # Все ресурсы с лейблом
+  kubectl delete namespace old-namespace                  # Весь namespace (ОСТОРОЖНО!)
+
+  # Форсировать удаление застрявшего пода:
+  kubectl delete pod bank-app-xyz --force --grace-period=0 -n banking
+
+═══ DEBUG И ДИАГНОСТИКА ══════════════════════════════════════════════════════════
+
+  # Временный debug под:
+  kubectl run debug --image=busybox --rm -it --restart=Never -- sh
+  kubectl run debug --image=nicolaka/netshoot --rm -it --restart=Never -- bash
+  # netshoot содержит все сетевые инструменты: ping, curl, dig, tcpdump, iperf
+
+  # Проверить DNS в кластере:
+  kubectl run test --image=busybox --rm -it --restart=Never -- \
+    nslookup bank-app-service.banking.svc.cluster.local
+
+  # Ephemeral debug container (kubectl 1.23+):
+  kubectl debug bank-app-xyz -it --image=busybox --target=bank-app -n banking
+
+  # Посмотреть ресурсы:
+  kubectl top pods -n banking               # CPU/Memory (нужен metrics-server)
+  kubectl top nodes
+
+  # Resource quota:
+  kubectl describe resourcequota -n banking
+  kubectl describe limitrange -n banking
+
+═══ CONTEXT AND NAMESPACE ═══════════════════════════════════════════════════════
+
+  # Посмотреть список contexts:
+  kubectl config get-contexts
+  #   CURRENT   NAME           CLUSTER        AUTHINFO       NAMESPACE
+  #   *         prod           prod-cluster   prod-admin     banking
+  #             staging        stg-cluster    stg-admin      banking
+  #             local          minikube       minikube       default
+
+  # Переключиться:
+  kubectl config use-context staging
+
+  # Быстро переключить namespace без изменения context:
+  kubectl -n kube-system get pods          # Временно другой namespace
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 3: СЦЕНАРИИ РАБОТЫ — "КАК ДЕЛАЮТ В КОМАНДЕ"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── СЦЕНАРИЙ 1: ДЕПЛОЙ НОВОЙ ВЕРСИИ ────────────────────────────────────────────
+
+  # 1. CI/CD собрал образ → registry/bank-app:v1.5.0
+  # 2. Обновить deployment:
+  kubectl set image deploy/bank-app bank-app=registry/bank-app:v1.5.0 -n banking
+
+  # 3. Следить за rollout:
+  kubectl rollout status deploy/bank-app -n banking -w
+  # Watching rollout "bank-app" rollout...
+  # Waiting for deployment "bank-app" rollout to finish: 1 out of 3 new replicas have been updated...
+  # Waiting for deployment "bank-app" rollout to finish: 2 out of 3 new replicas have been updated...
+  # deployment "bank-app" successfully rolled out
+
+  # 4. Проверить:
+  kubectl get pods -n banking
+  curl https://api.bank.ru/actuator/health
+
+─── СЦЕНАРИЙ 2: ОТКАТ СЛОМАННОГО ДЕПЛОЯ ────────────────────────────────────────
+
+  # Поды падают с CrashLoopBackOff!
+  kubectl get pods -n banking
+  # NAME                       READY   STATUS             RESTARTS
+  # bank-app-7d9f5b-xyz        0/1     CrashLoopBackOff   5
+
+  # 1. Смотреть логи:
+  kubectl logs bank-app-7d9f5b-xyz -n banking --previous
+  # java.lang.NullPointerException at TransferService.java:42
+
+  # 2. Смотреть события:
+  kubectl describe pod bank-app-7d9f5b-xyz -n banking | grep -A 10 Events
+
+  # 3. Откатить:
+  kubectl rollout undo deploy/bank-app -n banking
+  # deployment.apps/bank-app rolled back
+
+  # 4. Проверить:
+  kubectl rollout status deploy/bank-app -n banking
+
+─── СЦЕНАРИЙ 3: МАСШТАБИРОВАНИЕ ПОД НАГРУЗКОЙ ──────────────────────────────────
+
+  # Grafana показывает CPU > 80%, нужно добавить поды:
+  kubectl scale deploy/bank-app --replicas=6 -n banking
+
+  # Или обновить HPA:
+  kubectl patch hpa bank-app-hpa -n banking -p '{"spec":{"maxReplicas":20}}'
+
+  # Смотреть как поднимаются:
+  kubectl get pods -n banking -w
+
+─── СЦЕНАРИЙ 4: ДЕБАГ "ПОЧЕМУ НЕ СТАРТУЕТ" ─────────────────────────────────────
+
+  kubectl get pods -n banking
+  # bank-app-xyz   0/1   Pending   0   5m
+  # (Pending = не может найти место на ноде)
+
+  kubectl describe pod bank-app-xyz -n banking
+  # Events:
+  #   Warning  FailedScheduling  0/3 nodes: 3 Insufficient memory
+  # ПРИЧИНА: Недостаточно памяти. Либо уменьшить requests, либо добавить ноду.
+
+  # Другой случай — ImagePullBackOff:
+  # Events: Failed to pull image: unauthorized: not logged in
+  # РЕШЕНИЕ: Создать secret для registry
+
+  kubectl create secret docker-registry regcred \
+    --docker-server=registry.gitlab.com \
+    --docker-username=myuser \
+    --docker-password=mytoken \
+    -n banking
+
+  # Добавить в deployment spec:
+  # imagePullSecrets:
+  #   - name: regcred
+
+─── СЦЕНАРИЙ 5: ПРОВЕРИТЬ КОНФИГУРАЦИЮ ──────────────────────────────────────────
+
+  # Что за переменные получает под?
+  kubectl exec bank-app-xyz -n banking -- env | grep -E "SPRING|DB|REDIS"
+
+  # Прочитать секрет (base64 encoded):
+  kubectl get secret bank-secrets -n banking -o jsonpath='{.data.DB_PASSWORD}' | base64 -d
+
+  # Прочитать configmap:
+  kubectl get configmap bank-config -n banking -o yaml
+
+─── СЦЕНАРИЙ 6: ФОРСИРОВАТЬ ПЕРЕСОЗДАНИЕ ПОДОВ ──────────────────────────────────
+
+  # Например, нужно подтянуть новый секрет:
+  kubectl rollout restart deploy/bank-app -n banking
+
+  # Или удалить конкретный под (будет создан новый автоматически):
+  kubectl delete pod bank-app-old-xyz -n banking
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 4: ЛОКАЛЬНАЯ РАЗРАБОТКА С KUBERNETES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  MINIKUBE (для учёбы):
+    minikube start --cpus 4 --memory 8192 --driver=docker
+    minikube stop
+    minikube delete
+    minikube status
+    minikube dashboard              # Открыть web UI
+    minikube tunnel                 # LoadBalancer сервисы работают локально
+    eval $(minikube docker-env)     # Использовать docker minikube
+    minikube addons enable ingress  # Включить Nginx Ingress Controller
+    minikube ip                     # IP кластера
+
+  KIND (Kubernetes IN Docker — быстрее для CI):
+    kind create cluster --name bank
+    kind load docker-image myapp:latest --name bank  # Загрузить локальный образ
+    kind delete cluster --name bank
+
+  K3D (k3s в Docker — лёгкий K8s):
+    k3d cluster create bank
+    k3d image import myapp:latest -c bank
+
+  DOCKER DESKTOP:
+    Включить в Settings → Kubernetes → Enable Kubernetes
+    Самый простой способ для Windows/Mac!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ШПАРГАЛКА: ТИПИЧНЫЕ ОШИБКИ И РЕШЕНИЯ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ОШИБКА                      │ ПРИЧИНА                    │ РЕШЕНИЕ
+  ────────────────────────────┼────────────────────────────┼─────────────────────
+  CrashLoopBackOff            │ Приложение падает на старте│ kubectl logs --previous
+  ImagePullBackOff            │ Не может скачать образ     │ Проверить credentials
+  Pending                     │ Нет ресурсов на ноде       │ kubectl describe pod Events
+  OOMKilled                   │ Превышен memory limit      │ Увеличить limit
+  CreateContainerConfigError  │ Нет секрета/configmap      │ kubectl get secret,cm
+  Terminating (зависло)       │ Finalizer не отрабатывает  │ --force --grace-period=0
+  ErrImageNeverPull           │ imagePullPolicy=Never, нет │ Загрузить образ локально
+
+  DOCKER:
+  "permission denied /var/run/docker.sock" → добавить пользователя в группу docker
+  "port is already allocated"              → lsof -i :8080 → убить процесс
+  "no space left on device"               → docker system prune -a
+  "container has exit status 137"          → OOMKilled (нужно больше памяти)

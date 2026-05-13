@@ -1,0 +1,588 @@
+================================================================================
+  GIT + GITLAB — ПОЛНОЕ РУКОВОДСТВО ДЛЯ РАБОТЫ В КОМАНДЕ
+================================================================================
+
+"Git — машина времени для кода. GitLab — это GitHub но для корпораций,
+ с CI/CD, container registry и всем что нужно внутри компании."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 1: GIT — КАК ЭТО РАБОТАЕТ ВНУТРИ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 1.1 ТРИ СОСТОЯНИЯ ФАЙЛА ────────────────────────────────────────────────────
+
+  Working Directory   →   Staging Area (Index)   →   Repository (.git)
+  (редактируешь)          (git add)                   (git commit)
+
+  Каждый коммит — снимок (snapshot) ВСЕГО проекта, не diff.
+  Внутри хранятся blob (файлы), tree (директории), commit объекты.
+  Коммиты образуют направленный граф (DAG).
+
+─── 1.2 ОБЪЕКТЫ GIT ────────────────────────────────────────────────────────────
+
+  blob    — содержимое файла (сжато, SHA-1 хеш)
+  tree    — директория (список blob + tree с именами)
+  commit  — снимок: tree + author + message + parent commit(s)
+  tag     — указатель на commit с метаданными
+
+  # Посмотреть объект:
+  git cat-file -t abc123   # Тип объекта
+  git cat-file -p abc123   # Содержимое
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 2: ЕЖЕДНЕВНЫЕ КОМАНДЫ — ЧТО РЕАЛЬНО ИСПОЛЬЗУЮТ В РАБОТЕ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 2.1 НАСТРОЙКА (ОДИН РАЗ) ───────────────────────────────────────────────────
+
+  git config --global user.name "Danil Larkovich"
+  git config --global user.email "daniillarkovich@gmail.com"
+  git config --global core.editor "vim"       # или code --wait (VSCode)
+  git config --global init.defaultBranch main
+  git config --global pull.rebase true        # rebase вместо merge при pull
+  git config --global alias.lg "log --oneline --graph --all --decorate"
+  git config --global alias.st "status -sb"
+  git config --list                           # Посмотреть все настройки
+
+─── 2.2 БАЗОВЫЙ ЦИКЛ РАБОТЫ ────────────────────────────────────────────────────
+
+  # Начало дня:
+  git fetch origin             # Скачать изменения без merge
+  git pull --rebase            # Обновить свою ветку (rebase чище чем merge)
+  git status                   # Что изменено?
+  git log --oneline -10        # Последние 10 коммитов
+
+  # Работа над задачей:
+  git checkout -b feature/BANK-123-add-transfer-api   # Новая ветка
+  # ... пишешь код ...
+  git diff                     # Что изменилось (unstaged)
+  git diff --staged            # Что будет в коммите (staged)
+  git add src/main/java/com/bank/service/TransferService.java
+  git add -p                   # Интерактивно выбрать куски файла (patch)
+  git commit -m "feat(transfer): add transfer validation and limit check"
+
+  # Обновить ветку перед MR:
+  git fetch origin
+  git rebase origin/main       # Перенести коммиты поверх main
+  git push origin feature/BANK-123-add-transfer-api
+
+─── 2.3 ПРОСМОТР ИСТОРИИ ───────────────────────────────────────────────────────
+
+  git log                                    # Полная история
+  git log --oneline                          # Кратко
+  git log --oneline --graph --all            # Граф веток
+  git log --oneline -20                      # Последние 20
+  git log --since="2 weeks ago"
+  git log --author="Danil"
+  git log --grep="BANK-123"                  # По тексту коммита
+  git log -S "transferService"               # Искать где добавлена строка
+  git log --follow src/main/.../Transfer.java  # История одного файла
+  git show abc1234                           # Просмотреть коммит
+  git show abc1234:src/main/.../Transfer.java  # Файл из конкретного коммита
+
+─── 2.4 РАБОТА С ВЕТКАМИ ───────────────────────────────────────────────────────
+
+  git branch                   # Список веток
+  git branch -a                # Включая remote
+  git branch -v                # С последним коммитом
+  git branch feature/new       # Создать ветку
+  git checkout feature/new     # Переключиться
+  git checkout -b feature/new  # Создать И переключиться
+  git switch -c feature/new    # Современный синтаксис (git 2.23+)
+  git branch -d feature/done   # Удалить (только если смержена)
+  git branch -D feature/abort  # Удалить принудительно
+  git push origin --delete feature/old  # Удалить remote ветку
+
+  # Переименовать:
+  git branch -m old-name new-name
+  git push origin :old-name new-name
+
+─── 2.5 СЛИЯНИЕ И REBASE ───────────────────────────────────────────────────────
+
+  MERGE (создаёт merge commit, сохраняет историю):
+    git checkout main
+    git merge feature/payments
+    # Результат: merge commit с двумя родителями
+
+  REBASE (перемещает коммиты, линейная история):
+    git checkout feature/payments
+    git rebase main
+    # Результат: твои коммиты применены поверх main
+
+  РАЗНИЦА:
+    Merge:   A─B─C─D (main)
+                  └─E─F─G (feature)
+             Результат: A─B─C─D─M (M = merge commit объединяет D и G)
+                              └─E─F─G─┘
+
+    Rebase:  A─B─C─D (main)
+                      └─E'─F'─G' (feature, коммиты переписаны)
+             Чистая линейная история!
+
+  ЗОЛОТОЕ ПРАВИЛО: Никогда не rebase публичные ветки (main/develop)!
+
+─── 2.6 ИСПРАВЛЕНИЕ ОШИБОК ─────────────────────────────────────────────────────
+
+  # Отменить последний коммит (оставить изменения):
+  git reset --soft HEAD~1
+
+  # Отменить последний коммит (убрать изменения из staged):
+  git reset HEAD~1
+
+  # Отменить последний коммит (потерять все изменения!):
+  git reset --hard HEAD~1
+
+  # Исправить последний коммит (сообщение или добавить файл):
+  git add forgotten-file.java
+  git commit --amend --no-edit    # Добавить файл без изменения сообщения
+  git commit --amend -m "Исправленное сообщение"
+  # ТОЛЬКО если не запушен!
+
+  # Отменить конкретный коммит (безопасно, создаёт новый коммит):
+  git revert abc1234
+  git revert abc1234 --no-commit  # Не создавать коммит сразу
+
+  # Посмотреть что было до:
+  git reflog                      # История всех операций (последние 90 дней)
+  git checkout HEAD@{5}           # Вернуться к состоянию 5 операций назад
+
+─── 2.7 STASH — ОТКЛАДЫВАНИЕ ИЗМЕНЕНИЙ ─────────────────────────────────────────
+
+  # Нужно срочно переключиться, но работа не завершена:
+  git stash                        # Спрятать все изменения
+  git stash push -m "WIP: payment validation"  # С именем
+  git stash -u                     # Включая untracked файлы
+
+  git stash list                   # Список stash-ей
+  git stash pop                    # Применить последний stash и удалить
+  git stash apply stash@{2}        # Применить конкретный без удаления
+  git stash drop stash@{0}         # Удалить stash
+  git stash clear                  # Удалить все stash-и
+  git stash show -p                # Посмотреть содержимое
+
+─── 2.8 CHERRY-PICK ────────────────────────────────────────────────────────────
+
+  # Взять конкретный коммит из другой ветки:
+  git cherry-pick abc1234
+  git cherry-pick abc1234 def5678  # Несколько коммитов
+  git cherry-pick main~3..main~1   # Диапазон
+
+  # Использование в банке:
+  # Hotfix задеплоен в main → нужно перенести в release/1.5:
+  git checkout release/1.5
+  git cherry-pick <hotfix-commit-hash>
+
+─── 2.9 ТЕГИ ───────────────────────────────────────────────────────────────────
+
+  git tag                          # Список тегов
+  git tag v1.5.0                   # Lightweight tag (просто указатель)
+  git tag -a v1.5.0 -m "Release 1.5.0 - payment module"  # Annotated (лучше)
+  git tag -a v1.5.0 abc1234        # Тег на конкретный коммит
+  git push origin v1.5.0           # Запушить тег
+  git push origin --tags           # Запушить все теги
+  git checkout v1.5.0              # Переключиться на тег (detached HEAD)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 3: СТРАТЕГИИ ВЕТВЛЕНИЯ (BRANCHING STRATEGIES)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 3.1 GITFLOW (КЛАССИКА ДЛЯ БАНКОВ) ──────────────────────────────────────────
+
+  main ────────────────────────────────●───────────● (релиз v1.5, v1.6)
+                                      ↑           ↑
+  release/1.5 ──────────────────────●─           ─●
+                                   ↑               ↑
+  develop ─────●──●──●──●──────────────────●──●───
+               ↑     ↑             ↑     ↑
+  feature    f1─     f2─     f3──────     f4─
+
+  Ветки:
+    main     — только production-ready код, только через release или hotfix
+    develop  — интеграционная ветка, сюда мержатся features
+    feature/ — одна задача = одна ветка (feature/BANK-123-transfers)
+    release/ — подготовка релиза (только bugfixes, версия, changelog)
+    hotfix/  — срочный фикс прямо в main
+
+  Плюсы: структурированность, понятный процесс, подходит для релизов по расписанию.
+  Минусы: сложно, долгая обратная связь, не подходит для continuous delivery.
+
+─── 3.2 TRUNK-BASED DEVELOPMENT (СОВРЕМЕННЫЙ ПОДХОД, GOOGLE/AMAZON) ────────────
+
+  main ─────●──●──●──●──●──●──●──●──● (всегда deployable!)
+            ↑  ↑  ↑  ↑
+       short-lived feature branches (1-2 дня максимум!)
+
+  Правила:
+    - Ветки живут максимум 2 дня
+    - Маленькие коммиты, часто
+    - Feature flags для незавершённых фич
+    - CI запускается на каждый коммит в main
+    - Каждый коммит в main может быть задеплоен
+
+  Плюсы: быстрая обратная связь, нет merge hell, настоящий CI/CD.
+  Минусы: требует зрелости команды и хорошего тест-покрытия.
+
+─── 3.3 КОНВЕНЦИИ ИМЕНОВАНИЯ ВЕТОК В БАНКЕ ─────────────────────────────────────
+
+  feature/BANK-123-add-transfer-api       # Фича из Jira
+  feature/BANK-456-refactor-account-svc   # Рефакторинг
+  fix/BANK-789-null-pointer-transfer      # Баг фикс
+  hotfix/BANK-999-critical-payment-bug    # Критический хотфикс
+  release/2024-Q1-v1.5.0                 # Релизная ветка
+  chore/update-spring-boot-3.2           # Технические задачи
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 4: CONVENTIONAL COMMITS — СТАНДАРТ СООБЩЕНИЙ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Формат: <type>(<scope>): <description>
+
+  ТИПЫ:
+    feat     — новая функциональность (→ minor version)
+    fix      — баг фикс (→ patch version)
+    docs     — только документация
+    style    — форматирование, нет изменений логики
+    refactor — рефакторинг без новой функциональности
+    perf     — улучшение производительности
+    test     — добавление/изменение тестов
+    build    — изменения сборки, зависимостей
+    ci       — изменения CI/CD конфигурации
+    chore    — прочее (обновление зависимостей)
+    revert   — откат коммита
+
+  BREAKING CHANGE — добавить ! или в footer:
+    feat(api)!: change transfer endpoint from /transfer to /transfers
+
+  ПРИМЕРЫ (хорошие):
+    feat(transfer): add daily transfer limit validation
+    fix(account): prevent negative balance on withdrawal
+    feat(auth): implement JWT refresh token rotation
+    perf(query): add index on transactions.account_id for 10x speedup
+    fix(transfer)!: change amount field type from int to BigDecimal
+
+    BANK-123 feat(payment): add SWIFT payment support
+
+    Полный формат:
+    feat(payment): add retry logic for failed SWIFT transfers
+
+    Payments to international banks were failing silently.
+    Now retries 3 times with exponential backoff.
+    Falls back to manual review queue after all retries exhausted.
+
+    Closes #BANK-456
+    Reviewed-by: senior.dev@bank.ru
+
+  ПЛОХИЕ примеры:
+    "fix bug"          ← непонятно что
+    "работает"         ← нет смысла
+    "правки"           ← что за правки???
+    "WIP"              ← незавершённое нельзя пушить в main
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 5: GITLAB — КОРПОРАТИВНЫЙ GIT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 5.1 СТРУКТУРА GITLAB ───────────────────────────────────────────────────────
+
+  Group (Группа, напр. "bank-backend")
+    └── Subgroup (Подгруппа, напр. "payments")
+          ├── Project: payment-service      ← Git репозиторий
+          ├── Project: transfer-service
+          └── Project: notification-service
+
+  GitLab SaaS (gitlab.com) — публичный
+  GitLab Self-Managed — сервер банка (corp.bank.ru/gitlab) — данные внутри
+
+─── 5.2 НАСТРОЙКА SSH ДЛЯ GITLAB ───────────────────────────────────────────────
+
+  # Генерация SSH ключа:
+  ssh-keygen -t ed25519 -C "daniillarkovich@gmail.com" -f ~/.ssh/gitlab_bank
+
+  # Добавить в ~/.ssh/config:
+  Host gitlab.bank.ru
+    HostName gitlab.bank.ru
+    User git
+    IdentityFile ~/.ssh/gitlab_bank
+    IdentitiesOnly yes
+
+  # Скопировать публичный ключ:
+  cat ~/.ssh/gitlab_bank.pub
+  # Вставить в GitLab: Settings → SSH Keys → Add key
+
+  # Проверить:
+  ssh -T git@gitlab.bank.ru
+  # Ответ: Welcome to GitLab, @daniillarkovich!
+
+─── 5.3 MERGE REQUEST (MR) — КАК ЭТО РАБОТАЕТ В КОМАНДЕ ───────────────────────
+
+  Merge Request = Pull Request в GitHub. Это запрос на слияние ветки.
+
+  ПРОЦЕСС:
+  1. Разработчик создаёт MR из feature/BANK-123 → develop
+  2. Заполняет шаблон описания (что сделано, как тестировать, скриншоты)
+  3. Назначает Assignee (себя) и Reviewer(ов)
+  4. CI/CD pipeline запускается автоматически
+  5. Reviewer делает code review, пишет комментарии
+  6. Разработчик исправляет, делает новые коммиты
+  7. Pipeline проходит + апруv от reviewer → Merge (Squash или обычный)
+  8. Ветка автоматически удаляется
+
+  ШАБЛОН MR (`.gitlab/merge_request_templates/default.md`):
+  ## Что сделано
+  - Добавлена валидация лимита переводов
+  - Написаны unit тесты (покрытие 95%)
+
+  ## Тип изменения
+  - [x] Новая функциональность
+  - [ ] Баг фикс
+  - [ ] Breaking change
+
+  ## Как тестировать
+  1. POST /api/transfers с amount > 1,000,000 → должен вернуть 422
+  2. POST /api/transfers с amount = 1000 → должен пройти
+  3. Проверить лог: должен быть запись о проверке лимита
+
+  ## Checklist
+  - [x] Написаны тесты
+  - [x] Обновлена документация
+  - [x] Нет секретов в коде
+  - [x] Flyway миграция backward-compatible
+
+  Closes #BANK-123
+
+─── 5.4 CODE REVIEW — КАК ПРОВОДИТЬ ────────────────────────────────────────────
+
+  ЧТО СМОТРЕТЬ:
+    Логика    — правильно ли работает? Есть ли edge cases?
+    Тесты     — покрыты ли важные сценарии?
+    Безопасность — SQL injection? Авторизация проверяется?
+    Performance — нет ли N+1? Нужны ли индексы?
+    Читаемость — понятны ли названия? Нет лишней сложности?
+    Стандарты — соответствует ли code style команды?
+
+  КАК ПИСАТЬ КОММЕНТАРИИ:
+    Плохо: "Это неправильно"
+    Хорошо: "Здесь может быть NPE если account == null.
+             Предлагаю: Optional.ofNullable(account).orElseThrow(...)"
+
+    Prefix [nit] = nitpick (мелочь, не обязательно исправлять)
+    Prefix [blocking] = обязательно исправить до мержа
+    Prefix [question] = вопрос, не замечание
+
+─── 5.5 GITLAB CI/CD — КЛЮЧЕВЫЕ КОНЦЕПЦИИ ──────────────────────────────────────
+
+  Runners — агенты которые выполняют jobs:
+    Shared runners — общие (gitlab.com предоставляет)
+    Group runners — для всей группы
+    Project runners — только для проекта
+    Self-hosted runner — сервер в банке с docker executor
+
+  # Установить runner на сервер:
+  docker run -d --name gitlab-runner --restart always \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v gitlab-runner-config:/etc/gitlab-runner \
+    gitlab/gitlab-runner:latest
+
+  gitlab-runner register \
+    --url https://gitlab.bank.ru/ \
+    --token <runner-token> \
+    --executor docker \
+    --docker-image docker:24 \
+    --description "bank-docker-runner"
+
+  Protected branches — ветки main/develop:
+    - Нельзя force push
+    - Требуют MR (нельзя коммитить напрямую)
+    - MR requires approved pipeline
+
+  Protected variables — секреты в GitLab Settings → CI/CD → Variables:
+    DB_PASSWORD (masked, protected) → доступна только в main/release ветках
+    DOCKER_REGISTRY_TOKEN (masked) → для push в registry
+
+─── 5.6 GITLAB CONTAINER REGISTRY ─────────────────────────────────────────────
+
+  # Login:
+  docker login registry.gitlab.com -u daniillarkovich -p $CI_REGISTRY_PASSWORD
+  # Или personal access token с write_registry scope
+
+  # Build и push:
+  docker build -t registry.gitlab.com/bank-backend/payment-service:latest .
+  docker push registry.gitlab.com/bank-backend/payment-service:latest
+
+  # В .gitlab-ci.yml (автоматически):
+  docker-build:
+    script:
+      - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+      - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+      - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+─── 5.7 GITLAB ENVIRONMENTS И DEPLOYMENTS ──────────────────────────────────────
+
+  Environments:
+    development  → auto deploy при каждом push в develop
+    staging      → auto deploy при merge в main
+    production   → manual approval required
+
+  В .gitlab-ci.yml:
+    deploy-production:
+      environment:
+        name: production
+        url: https://api.bank.ru
+      when: manual
+      only:
+        - main
+
+  # Смотреть в GitLab → Deployments → Environments
+  # Там же: rollback одной кнопкой!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 6: .GITIGNORE — ЧТО НЕ КОММИТИТЬ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # .gitignore для Java/Spring Boot проекта:
+
+  # Build output
+  target/
+  *.class
+  *.jar
+  *.war
+
+  # IDE файлы (каждый разработчик имеет свои настройки)
+  .idea/
+  *.iml
+  .eclipse/
+  .settings/
+  .classpath
+  .project
+  .vscode/
+
+  # Конфиги с секретами — НИКОГДА не коммитить!
+  .env
+  .env.local
+  application-prod.yml
+  application-local.yml
+  *.pem
+  *.key
+
+  # OS файлы
+  .DS_Store
+  Thumbs.db
+
+  # Логи
+  *.log
+  logs/
+
+  # Maven wrapper
+  !.mvn/wrapper/maven-wrapper.jar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 7: ПРОДВИНУТЫЕ ВОЗМОЖНОСТИ GIT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 7.1 INTERACTIVE REBASE — ПЕРЕПИСЫВАНИЕ ИСТОРИИ ─────────────────────────────
+
+  git rebase -i HEAD~5    # Редактировать последние 5 коммитов
+
+  # Открывается редактор:
+  pick abc1 feat: add validation
+  pick abc2 fix typo
+  pick abc3 WIP: more work
+  pick abc4 more fixes
+  pick abc5 finally done
+
+  # Изменяем:
+  pick abc1 feat: add validation      # Оставить как есть
+  fixup abc2                          # Слить с предыдущим (без сообщения)
+  squash abc3                         # Слить с предыдущим (с сообщением)
+  squash abc4                         # То же
+  reword abc5                         # Оставить но изменить сообщение
+
+  # Результат: 2 чистых коммита вместо 5 мусорных
+  # ВАЖНО: только до push в remote!
+
+─── 7.2 GIT BISECT — НАЙТИ КАКОЙ КОММИТ СЛОМАЛ ────────────────────────────────
+
+  # Баг появился где-то между v1.4 и v1.5 (100 коммитов)
+  git bisect start
+  git bisect bad HEAD          # Текущий коммит — плохой
+  git bisect good v1.4         # v1.4 — хороший
+
+  # Git переключает на середину (бинарный поиск!)
+  # Тестируешь → говоришь git bisect good/bad
+  git bisect good              # Этот коммит ещё хороший
+  # Git переключает снова...
+  git bisect bad               # Этот плохой
+  # Через 7 итераций (log2(100)=7) найдёт виновный коммит!
+
+  git bisect reset             # Выйти из bisect
+
+─── 7.3 GIT HOOKS — АВТОМАТИЗАЦИЯ ─────────────────────────────────────────────
+
+  Hooks находятся в .git/hooks/ (bash скрипты).
+  Или используй Husky (npm) для Java через Maven plugin.
+
+  pre-commit — запускается перед коммитом:
+    #!/bin/bash
+    # Проверить что нет secrets в коде
+    if git diff --cached | grep -E "(password|secret|api_key)\s*=\s*['\"][^'\"]+['\"]"; then
+        echo "ERROR: Possible secret in commit!"
+        exit 1
+    fi
+
+    # Запустить тесты перед коммитом
+    mvn test -q
+    if [ $? -ne 0 ]; then
+        echo "Tests failed! Commit aborted."
+        exit 1
+    fi
+
+  commit-msg — проверить формат сообщения коммита:
+    #!/bin/bash
+    commit_msg=$(cat "$1")
+    pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,72}$"
+    if ! echo "$commit_msg" | grep -qE "$pattern"; then
+        echo "ERROR: Commit message doesn't follow Conventional Commits!"
+        echo "Example: feat(transfer): add limit validation"
+        exit 1
+    fi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 8: ТИПИЧНЫЙ РАБОЧИЙ ДЕНЬ С GIT (ПО РОЛЯМ)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  JUNIOR (ты сейчас):
+    git pull origin develop          # Обновиться
+    git checkout -b feature/BANK-123 # Новая задача из Jira
+    # ... пишет код 3-4 часа ...
+    git add -p                       # Внимательно смотрит что добавляет
+    git commit -m "feat: add ..."    # Осмысленное сообщение
+    git push origin feature/BANK-123
+    # Создаёт MR, просит Senior сделать review
+    # Исправляет замечания, пушит ещё раз
+
+  MIDDLE (через 1-2 года):
+    git fetch --all                  # Смотреть что происходит в команде
+    git log --oneline origin/develop -20  # Что смержили пока работал
+    git rebase -i HEAD~3             # Причесать коммиты перед MR
+    git diff origin/develop...HEAD   # Что изменил относительно develop
+    # Делает review MR коллег
+    # Знает bisect, stash, cherry-pick
+
+  SENIOR (через 3-5 лет):
+    # Проектирует branching strategy для команды
+    # Настраивает GitLab CI/CD pipeline
+    # Настраивает protected branches, MR шаблоны, required approvals
+    # Учит остальных, делает architecture review (не code review)
+    git reflog                       # Восстанавливает потерянное
+    git filter-branch / BFG          # Удаляет секреты из истории
+    # Принимает решения по merge strategy (squash vs rebase vs merge)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ★ ЗАДАНИЯ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Инициализируй этот проект: git init, сделай первый коммит по conventional commits
+2. Создай 3 ветки (feature, fix, hotfix), сделай коммиты, смержи
+3. Специально сломай что-то, сделай несколько коммитов, найди виновный с git bisect
+4. Попрактикуй interactive rebase: сделай 5 мусорных коммитов, сожми в 1 красивый
+5. Настрой pre-commit hook который запрещает коммит если есть слово "TODO"

@@ -1,0 +1,216 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║           С ЧЕГО НАЧАТЬ — ПУТЕВОДИТЕЛЬ ПО ПРОЕКТУ                              ║
+║           Java Bank Study Project — Полный курс от новичка до разработчика     ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+КАК ЗАПУСТИТЬ ПРОЕКТ:
+  Команда в терминале: mvn exec:java -Dexec.mainClass="com.bank.Main"
+  Или: mvn package && java -jar target/java-bank-study-1.0.0.jar
+  В IntelliJ IDEA: открыть Main.java → Shift+F10 (Run)
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 1 — ПРОЧИТАЙ ЭТО ПЕРВЫМ (1-2 часа)
+════════════════════════════════════════════════════════════════════════════════════
+
+  1. LEARN_BACKEND_CAREER.txt
+     ↳ Что такое backend разработчик в банке?
+     ↳ Что ты будешь делать на работе каждый день?
+     ↳ Какой стек нужен, сколько платят, как устроиться?
+
+  2. LEARN_OOP.txt
+     ↳ Объектно-ориентированное программирование (без кода)
+     ↳ 4 столпа ООП: инкапсуляция, наследование, полиморфизм, абстракция
+     ↳ SOLID принципы — читай по одному в день
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 2 — ОСНОВЫ JAVA (Неделя 1-3)
+════════════════════════════════════════════════════════════════════════════════════
+
+  ПОРЯДОК УРОКОВ В ПРОЕКТЕ (запускай Main.java → выбирай номер):
+
+  День 1:  [1] Hello World         → src/main/java/com/bank/basics/Lesson01_HelloWorld.java
+  День 2:  [2] Переменные и типы   → src/main/java/com/bank/basics/Lesson02_VariablesAndTypes.java
+  День 3:  [3] Операторы           → src/main/java/com/bank/basics/Lesson03_Operators.java
+  День 4:  [4] Условия и Switch    → src/main/java/com/bank/basics/Lesson04_ConditionsAndSwitch.java
+  День 5:  [5] Циклы               → src/main/java/com/bank/basics/Lesson05_Loops.java
+  День 6:  [6] Массивы             → src/main/java/com/bank/basics/Lesson06_Arrays.java
+  День 7:  [7] Строки              → src/main/java/com/bank/basics/Lesson07_Strings.java
+  День 8:  [8] Математика/BigDecimal → src/main/java/com/bank/basics/Lesson08_Math.java
+
+  ПОСЛЕ КАЖДОГО УРОКА — выполняй ЗАДАНИЕ из TODO.txt!
+  Ищи строки с [ ] в соответствующем уроке.
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 3 — ООП (Неделя 4-5)
+════════════════════════════════════════════════════════════════════════════════════
+
+  День 9:  [9] ООП демо банка      → смотри как работает Client, Account, Bank
+  Файлы для изучения (по порядку):
+    1. src/main/java/com/bank/oop/enums/       (TransactionType, AccountStatus, Currency)
+    2. src/main/java/com/bank/oop/exceptions/  (BankException, InsufficientFundsException)
+    3. src/main/java/com/bank/oop/interfaces/  (Transferable, Auditable)
+    4. src/main/java/com/bank/oop/model/Account.java       (абстрактный класс)
+    5. src/main/java/com/bank/oop/model/DebitAccount.java  (наследование)
+    6. src/main/java/com/bank/oop/model/SavingsAccount.java
+    7. src/main/java/com/bank/oop/model/CreditAccount.java
+    8. src/main/java/com/bank/oop/model/Client.java        (Builder паттерн)
+    9. src/main/java/com/bank/oop/model/Bank.java          (Iterable, методы)
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 4 — КОЛЛЕКЦИИ, GENERICS, STREAMS (Неделя 6-7)
+════════════════════════════════════════════════════════════════════════════════════
+
+  День 10: [10] Коллекции → List, Set, Map, Queue
+  День 11: [11] Generics  → GenericRepository<T>
+  День 12: [12] Streams   → Stream API, Lambda, Optional
+
+  Теория (читай параллельно):
+    LEARN_API_AND_DATABASES.txt (часть про коллекции и Stream)
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 5 — АЛГОРИТМЫ И СТРУКТУРЫ ДАННЫХ (Неделя 8-10)
+════════════════════════════════════════════════════════════════════════════════════
+
+  День 13: [13] Алгоритмы сортировки  → SortingAlgorithms.java
+  День 14: [14] Структуры данных      → DataStructures.java
+  День 15-17: Сложность алгоритмов   → algorithms/complexity/ (6 файлов)
+  День 18-20: Графы и рекурсия       → algorithms/graphs/, algorithms/recursion/
+
+  Отдельные файлы в порядке изучения:
+    src/main/java/com/bank/datastructures/StackImpl.java
+    src/main/java/com/bank/datastructures/QueueImpl.java
+    src/main/java/com/bank/datastructures/DequeAndLinkedListImpl.java
+    src/main/java/com/bank/datastructures/HashMapAndHeapImpl.java
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 6 — ПАТТЕРНЫ ПРОЕКТИРОВАНИЯ (Неделя 11)
+════════════════════════════════════════════════════════════════════════════════════
+
+  День 21: [15] Паттерны → Singleton, Factory, Observer, Strategy, Command
+  День 22: Читай src/main/java/com/bank/advanced/SpringJpaAnnotationsGuide.java
+  День 23: Читай src/main/java/com/bank/advanced/JavaModernSyntax.java
+            (Records, Sealed Classes, Pattern Matching, Virtual Threads)
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 7 — МНОГОПОТОЧНОСТЬ (Неделя 12-13)
+════════════════════════════════════════════════════════════════════════════════════
+
+  День 24: [16] Thread, synchronized, AtomicInteger, ReentrantLock
+           → src/main/java/com/bank/concurrency/ThreadBasics.java
+
+  День 25: [17] ExecutorService, Future, CompletableFuture
+           → src/main/java/com/bank/concurrency/ExecutorServiceDemo.java
+
+  День 26: [18] ConcurrentHashMap, BlockingQueue, CopyOnWriteArrayList
+           → src/main/java/com/bank/concurrency/ConcurrentCollections.java
+
+  День 27: Async vs Multithreading
+           → src/main/java/com/bank/concurrency/AsyncVsMultithreading.java
+
+  Теория: LEARN_CONCURRENCY_AND_TESTING.txt
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 8 — ТЕСТИРОВАНИЕ (Неделя 14)
+════════════════════════════════════════════════════════════════════════════════════
+
+  Файлы с примерами тестов:
+    src/test/java/com/bank/BasicsTest.java         (JUnit 5 основы)
+    src/test/java/com/bank/AlgorithmsTest.java     (Property-based тесты)
+    src/test/java/com/bank/MockitoAndServiceTest.java (Mockito, моки, стабы)
+
+  Запуск тестов: mvn test
+
+  Теория: LEARN_CONCURRENCY_AND_TESTING.txt
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 9 — БАЗЫ ДАННЫХ (Неделя 15-16)
+════════════════════════════════════════════════════════════════════════════════════
+
+  LEARN_DATABASES_DEEP.txt
+    - PostgreSQL схема, SQL задачи
+    - Оконные функции
+    - Индексы
+    - HikariCP пул соединений
+    - Flyway миграции
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 10 — SPRING BOOT (Неделя 17-20, ФИНАЛЬНЫЙ ЭТАП)
+════════════════════════════════════════════════════════════════════════════════════
+
+  LEARN_FRAMEWORKS_SPRING.txt — читай первым
+
+  Порядок действий:
+    1. Раскомментируй зависимости в pom.xml (раздел Spring Boot)
+    2. Создай BankApplication.java с @SpringBootApplication
+    3. Создай AccountController.java с REST эндпоинтами
+    4. Создай AccountService.java с бизнес-логикой
+    5. Создай AccountRepository.java extends JpaRepository
+    6. Настрой application.properties
+    7. Запусти: mvn spring-boot:run
+    8. Протестируй через Postman
+
+  Теория:
+    LEARN_FRAMEWORKS_SPRING.txt     — Spring Boot все аннотации
+    LEARN_SECURITY_AND_NETWORKS.txt — HTTP, JWT, Spring Security
+    LEARN_API_AND_DATABASES.txt     — REST API, SQL задачи
+
+════════════════════════════════════════════════════════════════════════════════════
+  ШАГ 11 — DevOps и деплой (по желанию)
+════════════════════════════════════════════════════════════════════════════════════
+
+  LEARN_DEVOPS.txt                  — Linux, Docker, Kubernetes, CI/CD
+  LEARN_DOCKER_K8S_ALL_COMMANDS.txt — все команды с примерами
+  LEARN_GIT_GITLAB.txt              — Git, GitFlow, GitLab CI/CD
+  Dockerfile                        — уже готов! Попробуй: docker build -t java-bank .
+
+════════════════════════════════════════════════════════════════════════════════════
+  ДОПОЛНИТЕЛЬНЫЕ ТЕМЫ (читай в любом порядке)
+════════════════════════════════════════════════════════════════════════════════════
+
+  LEARN_MICROSERVICES_VS_MONOLITH.txt   — архитектурные решения
+  LEARN_NETWORKING_CORPORATE.txt        — корпоративные сети, VPN, Firewall
+  LEARN_TUNNELS_VPN_DEEP.txt            — SSH туннели, WireGuard
+  LEARN_TEAM_ROLES_WORKFLOW.txt         — как работают команды (Scrum, Agile)
+  LEARN_COURSES_AND_STUDY_METHODS.txt   — как учиться эффективно
+  LEARN_COMPUTER_SCIENCE.txt            — Computer Science основы
+  assembler/LEARN_ASSEMBLER.txt         — Ассемблер (для понимания как работает CPU)
+
+════════════════════════════════════════════════════════════════════════════════════
+  БЫСТРАЯ ШПАРГАЛКА — КОМАНДЫ
+════════════════════════════════════════════════════════════════════════════════════
+
+  Запуск проекта:   mvn exec:java -Dexec.mainClass="com.bank.Main"
+  Компиляция:       mvn compile
+  Тесты:            mvn test
+  Сборка JAR:       mvn package
+  Запуск JAR:       java -jar target/java-bank-study-1.0.0.jar
+  Docker сборка:    docker build -t java-bank .
+  Docker запуск:    docker run -it java-bank
+
+════════════════════════════════════════════════════════════════════════════════════
+  СТРУКТУРА ФАЙЛОВ — КАРТА ПРОЕКТА
+════════════════════════════════════════════════════════════════════════════════════
+
+  START_HERE.txt                     ← ТЫ ЗДЕСЬ
+  TODO.txt                           ← Полный план обучения с заданиями
+  LEARN_*.txt                        ← Теоретические материалы
+  Dockerfile                         ← Docker конфигурация
+  pom.xml                            ← Зависимости Maven
+
+  src/main/java/com/bank/
+    Main.java                        ← Точка входа (запускай это!)
+    basics/           Lesson01-08    ← Java основы
+    oop/              model, enums, exceptions, interfaces
+    collections/      CollectionsLesson.java
+    generics/         GenericRepository.java
+    functional/       StreamsAndLambdas.java
+    algorithms/       SortingAlgorithms, DataStructures, graphs, recursion, complexity
+    datastructures/   Stack, Queue, Deque, HashMap своими руками
+    patterns/         PatternsDemo.java (Singleton, Factory, Observer, Strategy, Command)
+    concurrency/      ThreadBasics, ExecutorServiceDemo, ConcurrentCollections
+    advanced/         JavaModernSyntax, SpringJpaAnnotationsGuide
+
+  src/test/java/com/bank/
+    BasicsTest.java                  ← JUnit 5 тесты
+    AlgorithmsTest.java              ← Тесты алгоритмов
+    MockitoAndServiceTest.java       ← Mockito тесты

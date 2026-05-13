@@ -1,0 +1,290 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║          ООП — ОБЪЕКТНО-ОРИЕНТИРОВАННОЕ ПРОГРАММИРОВАНИЕ                        ║
+║          Полный разбор с банковскими примерами                                   ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+ООП — это способ думать о коде как о реальном мире.
+Реальный мир состоит из ОБЪЕКТОВ (клиент, счёт, банкомат).
+Каждый объект имеет СОСТОЯНИЕ (баланс) и ПОВЕДЕНИЕ (снять деньги).
+
+═══════════════════════════════════════════════════════════════════════════════════
+  4 СТОЛПА ООП
+═══════════════════════════════════════════════════════════════════════════════════
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. ИНКАПСУЛЯЦИЯ (Encapsulation)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ИДЕЯ: Скрываем внутренние данные и даём доступ только через методы.
+Как банковский сейф — снаружи кнопки (методы), внутри деньги (данные).
+
+ЗАЧЕМ:
+  - Защита данных от случайного изменения
+  - Можно изменить реализацию не ломая API
+  - Валидация при изменении (нельзя поставить баланс -1000)
+
+КАК В JAVA:
+  private double balance;        ← поле скрыто
+  public double getBalance() { return balance; }     ← геттер
+  public void deposit(double amount) {               ← сеттер с валидацией
+      if (amount <= 0) throw new IllegalArgumentException();
+      balance += amount;
+  }
+
+УРОВНИ ДОСТУПА (от самого открытого к самому закрытому):
+  public    — доступно всем
+  protected — доступно в том же пакете + подклассах
+  (default) — только в том же пакете
+  private   — только в том же классе
+
+КАК ОБЪЯСНЯЮТ НА YOUTUBE (Fireship, Amigo.code):
+  "Инкапсуляция — это как приборная панель автомобиля.
+   Ты крутишь руль (метод), не зная как устроена рулевая рейка (реализация)."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  2. НАСЛЕДОВАНИЕ (Inheritance)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ИДЕЯ: Один класс получает поля и методы другого.
+DRY — Don't Repeat Yourself. Не дублируй код.
+
+ИЕРАРХИЯ В БАНКЕ:
+  Account (abstract)
+  ├── DebitAccount      — обычный счёт, нельзя уйти в минус
+  ├── SavingsAccount    — накопительный, начисляются проценты
+  └── CreditAccount     — кредит, можно уйти в минус до лимита
+
+  abstract class Account {
+      protected BigDecimal balance;        // общее для всех
+      public abstract void withdraw(...);  // каждый реализует по-своему
+  }
+
+  class DebitAccount extends Account {
+      @Override
+      public void withdraw(BigDecimal amount, String desc) {
+          if (balance.compareTo(amount) < 0) throw new InsufficientFundsException();
+          balance = balance.subtract(amount);
+      }
+  }
+
+  class CreditAccount extends Account {
+      private BigDecimal creditLimit;
+      @Override
+      public void withdraw(BigDecimal amount, String desc) {
+          if (balance.subtract(amount).compareTo(creditLimit.negate()) < 0)
+              throw new CreditLimitExceededException();
+          balance = balance.subtract(amount);
+      }
+  }
+
+ВАЖНЫЕ КЛЮЧЕВЫЕ СЛОВА:
+  extends   — наследуем класс
+  super()   — вызов конструктора родителя
+  @Override — переопределяем метод
+  final     — запрет переопределения/наследования
+  abstract  — класс/метод требует переопределения
+
+ПРАВИЛО: Наследование — "является" (IS-A).
+  DebitAccount IS-A Account ✓
+  Account HAS-A Transaction ✓ (это уже композиция!)
+
+ПРОБЛЕМА РОМБА (Java решает через интерфейсы):
+  Java — только одиночное наследование классов.
+  Но класс может реализовывать МНОГО интерфейсов.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  3. ПОЛИМОРФИЗМ (Polymorphism)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ИДЕЯ: Один интерфейс — разные реализации.
+"Poly" = много, "morph" = форма.
+
+ДВА ВИДА:
+  Компиляционный (Overloading) — одно имя метода, разные параметры:
+    deposit(BigDecimal amount)
+    deposit(BigDecimal amount, String currency)
+    deposit(double amount) ← менее точный, избегай в банке!
+
+  Рантаймовый (Overriding) — динамическое связывание:
+    Account account = new SavingsAccount(...);  // переменная типа Account
+    account.withdraw(100);  // вызывается метод SavingsAccount, не Account!
+
+МОЩЬ ПОЛИМОРФИЗМА:
+  List<Account> accounts = Arrays.asList(
+      new DebitAccount(...),
+      new SavingsAccount(...),
+      new CreditAccount(...)
+  );
+
+  // Один цикл обрабатывает ВСЕ типы счетов!
+  for (Account acc : accounts) {
+      acc.applyMonthlyFee(); // каждый делает это по-своему
+  }
+
+INSTANCEOF и PATTERN MATCHING (Java 16+):
+  if (account instanceof SavingsAccount sa) {
+      sa.applyInterest(); // sa уже правильного типа!
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  4. АБСТРАКЦИЯ (Abstraction)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ИДЕЯ: Скрываем сложность, показываем только важное.
+Когда ты используешь .sort() — тебе не важно как именно сортирует.
+
+В JAVA — два инструмента:
+
+Abstract Class (когда есть общее состояние + общее поведение):
+  abstract class Account {
+      protected BigDecimal balance;     // состояние
+      public void deposit(BigDecimal a) { balance = balance.add(a); } // общее поведение
+      public abstract String getType(); // ОБЯЗАН переопределить подкласс
+  }
+
+Interface (когда только контракт, без состояния):
+  interface Transferable {
+      void deposit(BigDecimal amount, String desc);
+      void withdraw(BigDecimal amount, String desc);
+      BigDecimal getBalance();
+  }
+
+РАЗНИЦА abstract class vs interface:
+┌──────────────────┬────────────────────────┬────────────────────────┐
+│                  │ abstract class         │ interface              │
+├──────────────────┼────────────────────────┼────────────────────────┤
+│ Наследование     │ только от ОДНОГО       │ можно реализовать МНОГО│
+│ Поля             │ любые (protected/pri.) │ только public static   │
+│ Конструктор      │ есть (через super())   │ нет                    │
+│ Методы           │ abstract + реализован. │ default + abstract     │
+│ Когда            │ IS-A + общий код       │ CAN-DO (контракт)      │
+└──────────────────┴────────────────────────┴────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ПРИНЦИПЫ SOLID
+═══════════════════════════════════════════════════════════════════════════════════
+Это не отдельная тема — это ПРАВИЛА хорошего ООП кода.
+
+S — Single Responsibility Principle (единственная ответственность)
+    Класс отвечает за ОДНО. Account хранит баланс — НЕ шлёт email.
+    EmailService шлёт email. BankAccount управляет деньгами.
+
+O — Open/Closed Principle (открыт для расширения, закрыт для изменения)
+    Новый тип счёта = новый класс, НЕ изменение Account.
+    Добавляем PremiumAccount extends SavingsAccount, не трогая старый код.
+
+L — Liskov Substitution (заменимость)
+    Где ожидается Account — можно передать SavingsAccount.
+    SavingsAccount не должен НАРУШАТЬ контракт Account.
+
+I — Interface Segregation (разделение интерфейсов)
+    Лучше несколько маленьких интерфейсов чем один большой.
+    Transferable, Auditable, Blockable — не один "мегаинтерфейс".
+
+D — Dependency Inversion (инверсия зависимостей)
+    Зависеть от АБСТРАКЦИИ, не от конкретики.
+    AccountService зависит от AccountRepository (интерфейс),
+    не от JdbcAccountRepository (конкретный класс с JDBC).
+
+═══════════════════════════════════════════════════════════════════════════════════
+  КАК ЭТО РЕАЛЬНО ИСПОЛЬЗУЮТ В БАНКЕ
+═══════════════════════════════════════════════════════════════════════════════════
+
+ПРИМЕР: Обработка платежей
+
+  interface PaymentProcessor {
+      PaymentResult process(Payment payment);
+  }
+
+  class CardPaymentProcessor implements PaymentProcessor {
+      public PaymentResult process(Payment payment) { /* Visa/MC API */ }
+  }
+
+  class SbpPaymentProcessor implements PaymentProcessor {
+      public PaymentResult process(Payment payment) { /* СБП API */ }
+  }
+
+  class CryptoPaymentProcessor implements PaymentProcessor {
+      public PaymentResult process(Payment payment) { /* Web3 */ }
+  }
+
+  // PaymentService не знает какой процессор используется!
+  class PaymentService {
+      private final PaymentProcessor processor; // инжектируется через DI
+      PaymentService(PaymentProcessor processor) { this.processor = processor; }
+      public void pay(Payment p) { processor.process(p); } // полиморфизм
+  }
+
+Когда добавляют новый тип оплаты (например, BNPL) — просто создают новый класс.
+СТАРЫЙ КОД НЕ МЕНЯЕТСЯ. Это и есть Open/Closed.
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ПАТТЕРНЫ ПРОЕКТИРОВАНИЯ (Design Patterns)
+═══════════════════════════════════════════════════════════════════════════════════
+Паттерны — готовые рецепты для типичных проблем ООП.
+
+ПОРОЖДАЮЩИЕ (создание объектов):
+  Singleton   — один экземпляр (BankConfig, DatabasePool)
+  Builder     — сложный объект поэтапно (Client.builder().name().passport().build())
+  Factory     — создание без указания конкретного класса
+  Prototype   — клонирование (копирование счёта)
+  Abstract Factory — семейства объектов (RussianBank, EuropeanBank — разные правила)
+
+СТРУКТУРНЫЕ (организация классов):
+  Adapter     — совместимость несовместимого (старый API ↔ новый API)
+  Decorator   — добавить поведение без наследования (логирование, шифрование)
+  Proxy       — заместитель (ленивая загрузка, кэш, контроль доступа)
+  Facade      — упрощённый интерфейс к сложной системе
+  Composite   — дерево объектов (структура банковской группы)
+
+ПОВЕДЕНЧЕСКИЕ (взаимодействие объектов):
+  Observer    — подписка на события (уведомление о транзакции)
+  Strategy    — выбор алгоритма (разные стратегии начисления процентов)
+  Command     — операция как объект (история + отмена)
+  Template    — шаблон с хуками (процесс верификации платежа)
+  Chain of Responsibility — цепочка обработчиков (антифрод проверки)
+
+═══════════════════════════════════════════════════════════════════════════════════
+  ЧАСТЫЕ ОШИБКИ И КАК ИХ ИЗБЕЖАТЬ
+═══════════════════════════════════════════════════════════════════════════════════
+
+1. Не используй наследование "для экономии кода":
+   ❌ class Manager extends Employee extends Person extends DatabaseObject
+   ✓  Используй композицию: Manager HAS-A Employee HAS-A Address
+
+2. Не делай God Object (класс который знает всё):
+   ❌ class Bank { обрабатывает платежи, хранит клиентов, шлёт SMS, ведёт лог }
+   ✓  BankService, ClientRepository, SmsService, AuditLogger — разные классы
+
+3. Не открывай внутренности коллекций:
+   ❌ public List<Transaction> transactions; // прямой доступ!
+   ✓  public List<Transaction> getTransactions() { return Collections.unmodifiableList(transactions); }
+
+4. equals() и hashCode() должны переопределяться вместе!
+   Если equals() — обязательно hashCode(). Иначе HashMap сломается.
+
+═══════════════════════════════════════════════════════════════════════════════════
+  РЕСУРСЫ (КАК ЛЮДИ РЕАЛЬНО ИЗУЧАЮТ ЭТО)
+═══════════════════════════════════════════════════════════════════════════════════
+YouTube каналы (русскоязычные):
+  - Алишер Валеев (Java для начинающих на русском)
+  - Иван Непомнящий — JavaRush YouTube
+  - amigous.ru — практические задачи
+
+YouTube (английский):
+  - Fireship — короткие видео "X in 100 seconds"
+  - Traversy Media — практические туториалы
+  - Tim Corey — .NET, но принципы те же
+
+Книги:
+  - "Чистый код" — Роберт Мартин (Uncle Bob) — ОБЯЗАТЕЛЬНО
+  - "Паттерны проектирования" — Gang of Four — классика
+  - "Рефакторинг" — Мартин Фаулер
+  - "ООП с нуля" — Грэди Буч (для теории)
+
+Практика:
+  - JavaRush.ru — задачи с нарастающей сложностью
+  - LeetCode — алгоритмы
+  - CodeWars — практика
+  - GitHub — читай чужой код! Spring Boot, Hibernate — отличный код для изучения
+
+ГЛАВНЫЙ СОВЕТ:
+  Не заучивай термины. Понимай ЗАЧЕМ.
+  Инкапсуляция — чтобы не сломали. Наследование — чтобы не дублировали.
+  Полиморфизм — чтобы легко добавлять. Абстракция — чтобы не усложнять.

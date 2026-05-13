@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Portal — Образовательная платформа</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="app-header">
+    <div class="header-left">
+        <button id="sidebar-toggle" class="icon-btn" title="Меню">☰</button>
+        <div class="logo">
+            <span class="logo-icon">☕</span>
+            <span class="logo-text">Java Portal</span>
+        </div>
+    </div>
+    <div class="header-center">
+        <input type="text" id="search-input" placeholder="🔍 Поиск по задачам и темам..." autocomplete="off">
+        <div id="search-results" class="search-dropdown" style="display:none"></div>
+    </div>
+    <div class="header-right">
+        <div class="progress-widget">
+            <span id="progress-label">0 / 0 задач</span>
+            <div class="progress-bar-outer">
+                <div id="progress-bar-fill" class="progress-bar-fill" style="width:0%"></div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="app-body">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+        <div class="sidebar-inner">
+            <div class="sidebar-section-label">КУРСЫ</div>
+            <nav id="course-nav">
+                <!-- JS generated -->
+            </nav>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content">
+
+        <!-- WELCOME PAGE -->
+        <div id="page-welcome" class="page active">
+            <div class="welcome-hero">
+                <div class="welcome-icon">☕</div>
+                <h1>Java Portal</h1>
+                <p class="welcome-subtitle">Комплексный курс от Hello World до DevOps</p>
+                <div class="welcome-stats">
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-courses">12</div>
+                        <div class="stat-label">курсов</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-tasks">1000+</div>
+                        <div class="stat-label">задач</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-levels">3</div>
+                        <div class="stat-label">уровня сложности</div>
+                    </div>
+                </div>
+                <p class="welcome-hint">👈 Выберите курс в левом меню</p>
+            </div>
+            <div class="course-grid" id="course-grid">
+                <!-- JS generated -->
+            </div>
+        </div>
+
+        <!-- CHAPTER PAGE (lecture + tasks) -->
+        <div id="page-chapter" class="page" style="display:none">
+            <div class="chapter-header">
+                <button class="back-btn" onclick="app.goBack()">← Назад</button>
+                <div class="chapter-meta">
+                    <span id="chapter-course-name" class="breadcrumb-course"></span>
+                    <span class="breadcrumb-sep">›</span>
+                    <span id="chapter-title-header" class="breadcrumb-chapter"></span>
+                </div>
+            </div>
+
+            <!-- Tab bar -->
+            <div class="tab-bar">
+                <button class="tab-btn active" id="tab-lecture" onclick="app.showTab('lecture')">📖 Лекция</button>
+                <button class="tab-btn" id="tab-tasks-easy" onclick="app.showTab('easy')">🟢 Лёгкие</button>
+                <button class="tab-btn" id="tab-tasks-medium" onclick="app.showTab('medium')">🟡 Средние</button>
+                <button class="tab-btn" id="tab-tasks-hard" onclick="app.showTab('hard')">🔴 Сложные</button>
+            </div>
+
+            <!-- Lecture tab -->
+            <div id="tab-content-lecture" class="tab-content active">
+                <div id="lecture-body" class="lecture-body"></div>
+            </div>
+
+            <!-- Task list tabs -->
+            <div id="tab-content-easy" class="tab-content" style="display:none">
+                <div id="task-list-easy" class="task-list"></div>
+            </div>
+            <div id="tab-content-medium" class="tab-content" style="display:none">
+                <div id="task-list-medium" class="task-list"></div>
+            </div>
+            <div id="tab-content-hard" class="tab-content" style="display:none">
+                <div id="task-list-hard" class="task-list"></div>
+            </div>
+        </div>
+
+        <!-- TASK PAGE (code editor) -->
+        <div id="page-task" class="page" style="display:none">
+            <div class="task-header">
+                <button class="back-btn" onclick="app.closeTask()">← К заданиям</button>
+                <div class="task-title-area">
+                    <span id="task-difficulty-badge" class="difficulty-badge"></span>
+                    <h2 id="task-title"></h2>
+                </div>
+            </div>
+
+            <div class="task-workspace">
+                <!-- Left: task description -->
+                <div class="task-description-panel">
+                    <div id="task-description" class="task-description"></div>
+                    <div class="hints-section">
+                        <button class="hint-btn" id="hint-toggle" onclick="app.toggleHints()">💡 Показать подсказки</button>
+                        <div id="hints-list" class="hints-list" style="display:none"></div>
+                    </div>
+                    <div class="task-actions-bottom">
+                        <button class="btn btn-success" id="btn-solved" onclick="app.markSolved()">✓ Выполнено</button>
+                    </div>
+                </div>
+
+                <!-- Right: editor + output -->
+                <div class="editor-panel">
+                    <div class="editor-toolbar">
+                        <div class="editor-toolbar-left">
+                            <span class="editor-lang-badge">☕ Java</span>
+                            <span class="shortcut-hint">Ctrl+Enter — запуск</span>
+                        </div>
+                        <div class="editor-toolbar-right">
+                            <span id="snippet-badge" class="snippet-badge" style="display:none">⚡ Snippet</span>
+                            <div class="font-size-controls" title="Размер шрифта">
+                                <button class="font-size-btn" onclick="app.changeFontSize(-1)" title="Уменьшить шрифт">−</button>
+                                <span id="font-size-display">14px</span>
+                                <button class="font-size-btn" onclick="app.changeFontSize(1)" title="Увеличить шрифт">+</button>
+                            </div>
+                            <button id="snippet-mode-btn" class="btn btn-sm btn-secondary" onclick="app.toggleSnippetMode()" title="Snippet-режим: пишите команды без class/main">⚡ Snippet</button>
+                            <button class="btn btn-sm btn-secondary" onclick="app.resetCode()">↺ Сбросить</button>
+                            <button class="btn btn-sm btn-primary" onclick="app.runCode()" id="run-btn">▶ Запустить</button>
+                        </div>
+                    </div>
+                    <!-- File tabs — shown only in multi-file mode -->
+                    <div id="editor-file-tabs" class="editor-file-tabs" style="display:none">
+                        <button class="file-tab-add" onclick="app.addEditorFile()" title="Добавить файл">＋ Файл</button>
+                    </div>
+                    <div id="monaco-editor" style="height: 520px;"></div>
+                    <div class="editor-resize-handle" id="editor-resize-handle"></div>
+                    <div class="output-panel">
+                        <div class="output-header">
+                            <span>📤 Вывод программы</span>
+                            <button class="btn btn-xs btn-secondary" onclick="app.clearOutput()">Очистить</button>
+                        </div>
+                        <pre id="code-output" class="code-output">// Нажмите ▶ Запустить или Ctrl+Enter</pre>
+                    </div>
+                    <div id="test-results" class="test-results" style="display:none"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" style="display:none">
+    <div class="spinner"></div>
+    <p>Выполняю код...</p>
+</div>
+
+<!-- DATA FILES — загружаем все курсы -->
+<script th:src="@{/js/data/java_basics.js}"></script>
+<script th:src="@{/js/data/oop.js}"></script>
+<script th:src="@{/js/data/collections.js}"></script>
+<script th:src="@{/js/data/functional.js}"></script>
+<script th:src="@{/js/data/algorithms.js}"></script>
+<script th:src="@{/js/data/patterns.js}"></script>
+<script th:src="@{/js/data/concurrency.js}"></script>
+<script th:src="@{/js/data/spring.js}"></script>
+<script th:src="@{/js/data/sql.js}"></script>
+<script th:src="@{/js/data/devops.js}"></script>
+<script th:src="@{/js/data/git.js}"></script>
+<script th:src="@{/js/data/networks.js}"></script>
+
+<!-- Monaco Editor -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+
+<!-- Main app -->
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>

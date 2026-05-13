@@ -1,0 +1,1018 @@
+================================================================================
+  КОРПОРАТИВНЫЕ СЕТИ — ПОЛНОЕ РУКОВОДСТВО ДЛЯ BACKEND РАЗРАБОТЧИКА
+================================================================================
+
+"Понимание сети — это разница между разработчиком который пишет код и тем,
+ кто понимает как его код работает в реальном мире под нагрузкой в production."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 1: ОСНОВЫ СЕТЕЙ (ФУНДАМЕНТ)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 1.1 МОДЕЛЬ OSI — 7 УРОВНЕЙ ─────────────────────────────────────────────────
+
+7 Application    HTTP, HTTPS, FTP, SMTP, DNS, SNMP
+                 ↕ Что ты пишешь в Spring Boot
+6 Presentation   SSL/TLS шифрование, сжатие, кодирование (JSON/XML)
+5 Session        Управление сессиями, RPC
+4 Transport      TCP, UDP — сегментация данных, надёжность
+                 ↕ Порты, соединения
+3 Network        IP — маршрутизация пакетов через роутеры
+                 ↕ IP адреса, подсети
+2 Data Link      Ethernet, Wi-Fi — передача фреймов по физ. сети
+                 ↕ MAC адреса
+1 Physical       Физические биты — кабели, радиоволны, оптика
+
+Для разработчика важны уровни 3-7.
+
+─── 1.2 TCP/IP — МОДЕЛЬ ИНТЕРНЕТА ──────────────────────────────────────────────
+
+Application Layer  = OSI 5+6+7  (HTTP, DNS, SMTP)
+Transport Layer    = OSI 4       (TCP, UDP)
+Internet Layer     = OSI 3       (IP, ICMP, ARP)
+Network Access     = OSI 1+2     (Ethernet, Wi-Fi)
+
+TCP (Transmission Control Protocol):
+  - Надёжная доставка (подтверждения ACK, повторная передача)
+  - Гарантированный порядок пакетов
+  - Управление потоком (flow control)
+  - Three-way handshake: SYN → SYN-ACK → ACK
+  - Используется для: HTTP/HTTPS, PostgreSQL, Redis, Kafka
+  - Минус: накладные расходы на подтверждения
+
+UDP (User Datagram Protocol):
+  - Быстро, без гарантий
+  - Нет соединения, нет подтверждений
+  - Используется для: DNS, VoIP, стриминг видео, gaming
+  - Плюс: минимальные задержки
+
+─── 1.3 IP АДРЕСАЦИЯ ───────────────────────────────────────────────────────────
+
+IPv4: 4 байта = 32 бита = X.X.X.X (0-255 каждое)
+  Всего: 4.3 миллиарда адресов
+
+ЧАСТНЫЕ (RFC 1918) — не маршрутизируются в интернет:
+  10.0.0.0   - 10.255.255.255   (10.0.0.0/8)      — крупные корпорации
+  172.16.0.0 - 172.31.255.255   (172.16.0.0/12)   — дата-центры
+  192.168.0.0- 192.168.255.255  (192.168.0.0/16)  — домашние сети
+
+СПЕЦИАЛЬНЫЕ:
+  127.0.0.1      — loopback (localhost)
+  0.0.0.0        — все интерфейсы (bind)
+  255.255.255.255 — broadcast
+
+CIDR НОТАЦИЯ:
+  192.168.1.0/24 — подсеть из 254 хостов (последний октет: .1-.254)
+  10.0.0.0/8     — 16 миллионов адресов
+  10.10.1.0/27   — 30 хостов (2^5 - 2 = 30)
+
+  /24 = маска 255.255.255.0   → 256 адресов - 2 = 254 хоста
+  /25 = маска 255.255.255.128 → 128 адресов - 2 = 126 хостов
+  /26 = 64 адреса → 62 хоста
+  /27 = 32 адреса → 30 хостов
+  /28 = 16 адресов → 14 хостов
+
+─── 1.4 DNS — СИСТЕМА ДОМЕННЫХ ИМЁН ───────────────────────────────────────────
+
+DNS переводит имена в IP адреса.
+
+ПРОЦЕСС РАЗРЕШЕНИЯ (bank.ru → 1.2.3.4):
+  1. Браузер проверяет локальный кеш
+  2. ОС проверяет /etc/hosts (C:\Windows\System32\drivers\etc\hosts)
+  3. Запрос к Recursive Resolver (DNS сервер провайдера или 8.8.8.8)
+  4. Resolver спрашивает Root Server (.) → "где .ru сервер?"
+  5. Root Server → "спроси у TLD .ru сервера"
+  6. TLD .ru сервер → "спроси у авторитативного сервера bank.ru"
+  7. Авторитативный DNS → "1.2.3.4"
+  8. Resolver кеширует ответ (TTL = 300s) → возвращает браузеру
+
+DNS ЗАПИСИ:
+  A     — hostname → IPv4 (bank.ru → 1.2.3.4)
+  AAAA  — hostname → IPv6
+  CNAME — псевдоним (www.bank.ru → bank.ru)
+  MX    — почтовый сервер (bank.ru → mail.bank.ru)
+  TXT   — текст (SPF, DKIM, верификация домена)
+  NS    — делегирование подзоны
+  PTR   — обратный DNS (1.2.3.4 → bank.ru)
+  SRV   — сервисы (Kubernetes использует: _http._tcp.service.namespace.svc.cluster.local)
+
+ВНУТРЕННИЙ DNS БАНКА:
+  Каждый микросервис доступен по имени:
+  payment-service.banking.svc.cluster.local → 10.96.0.50
+  postgres-service.banking.svc.cluster.local → 10.96.0.100
+  redis.banking.svc.cluster.local → 10.96.0.200
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 2: КОРПОРАТИВНАЯ АРХИТЕКТУРА СЕТИ БАНКА
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 2.1 ЗОНЫ БЕЗОПАСНОСТИ ──────────────────────────────────────────────────────
+
+INTERNET (недоверенная зона)
+    │
+    ▼
+┌──────────────────────────────────────────┐
+│  EDGE ZONE (Периметр)                    │
+│  ┌─────────────┐  ┌──────────────────┐   │
+│  │ WAF + DDoS  │  │  External DNS    │   │
+│  │ Protection  │  │  (Cloudflare)    │   │
+│  └─────────────┘  └──────────────────┘   │
+└──────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────┐
+│  DMZ (Demilitarized Zone)                │
+│  Публично доступные сервисы              │
+│  ┌──────────┐  ┌──────────┐             │
+│  │ API GW   │  │  Nginx   │             │
+│  │ (Kong)   │  │  (HTTPS) │             │
+│  └──────────┘  └──────────┘             │
+│  ┌──────────────────────────┐           │
+│  │  Load Balancers (L7)     │           │
+│  └──────────────────────────┘           │
+└──────────────────────────────────────────┘
+    │
+    ▼ (Firewall: только авторизованные порты)
+┌──────────────────────────────────────────┐
+│  INTRANET (Внутренняя сеть)              │
+│  Приложения и сервисы                    │
+│  ┌────────────┐  ┌────────────────────┐  │
+│  │ K8s        │  │  Message Brokers   │  │
+│  │ Cluster    │  │  Kafka, RabbitMQ   │  │
+│  └────────────┘  └────────────────────┘  │
+└──────────────────────────────────────────┘
+    │
+    ▼ (Firewall: только из application tier)
+┌──────────────────────────────────────────┐
+│  DATA ZONE (Максимально защищённая)      │
+│  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+│  │PostgreSQL│  │  Redis   │  │Elastic │ │
+│  │ Cluster  │  │ Cluster  │  │Search  │ │
+│  └──────────┘  └──────────┘  └────────┘ │
+└──────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────┐
+│  MANAGEMENT ZONE                         │
+│  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+│  │Monitoring│  │  CI/CD   │  │  Logs  │ │
+│  │Prometheus│  │ Jenkins  │  │  ELK   │ │
+│  └──────────┘  └──────────┘  └────────┘ │
+└──────────────────────────────────────────┘
+
+─── 2.2 VLAN — ВИРТУАЛЬНЫЕ ЛОКАЛЬНЫЕ СЕТИ ─────────────────────────────────────
+
+VLAN логически разделяет физическую сеть. Устройства в разных VLAN не видят
+друг друга без L3 маршрутизации, даже если подключены к одному коммутатору.
+
+Типичная разбивка VLAN в банке:
+
+VLAN ID  │ Назначение           │ Подсеть
+─────────┼──────────────────────┼────────────────
+VLAN 10  │ Management           │ 10.0.10.0/24
+VLAN 20  │ DMZ (веб, API GW)    │ 10.0.20.0/24
+VLAN 30  │ Application servers  │ 10.0.30.0/24
+VLAN 40  │ Database servers     │ 10.0.40.0/24
+VLAN 50  │ Workstations (офис)  │ 10.0.50.0/22  (1000+ хостов)
+VLAN 60  │ Wi-Fi guests         │ 10.0.60.0/24
+VLAN 70  │ VoIP phones          │ 10.0.70.0/24
+VLAN 80  │ Security cameras     │ 10.0.80.0/24
+VLAN 100 │ CI/CD runners        │ 10.0.100.0/24
+
+Правила межсетевого экранирования:
+  VLAN 30 → VLAN 40: ALLOW tcp:5432 (PostgreSQL)
+  VLAN 30 → VLAN 40: ALLOW tcp:6379 (Redis)
+  VLAN 50 → VLAN 30: DENY (офисные машины НЕ имеют доступа к серверам)
+  VLAN 20 → VLAN 30: ALLOW tcp:8080 (API GW → приложения)
+  ANY     → VLAN 40: DENY (только из VLAN 30!)
+
+─── 2.3 ПОДСЕТИ (SUBNETTING) ───────────────────────────────────────────────────
+
+Как разбить 10.0.0.0/16 для банка?
+
+Задача: нужно 8 зон по ~250 хостов + 2 зоны по 1000 хостов
+
+Решение:
+  Офис (1000 хостов): 10.0.0.0/22    → 1022 хоста (10.0.0.1 - 10.0.3.254)
+  Гости (1000 хостов): 10.0.4.0/22   → 1022 хоста
+  DMZ   (250 хостов): 10.0.8.0/24    → 254 хоста
+  Apps  (250 хостов): 10.0.9.0/24    → 254 хоста
+  DB    (250 хостов): 10.0.10.0/24   → 254 хоста
+  Mgmt  (250 хостов): 10.0.11.0/24   → 254 хоста
+  VoIP  (250 хостов): 10.0.12.0/24   → 254 хоста
+  CI/CD (250 хостов): 10.0.13.0/24   → 254 хоста
+  ... резерв: 10.0.14.0 - 10.0.255.0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 3: БАЛАНСИРОВЩИКИ НАГРУЗКИ (LOAD BALANCERS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 3.1 L4 VS L7 БАЛАНСИРОВЩИКИ ───────────────────────────────────────────────
+
+L4 (Transport Layer) — балансировка по IP + порту:
+  - Не смотрит на HTTP заголовки / содержимое
+  - Очень быстро, низкие задержки
+  - Простая логика: round-robin по TCP соединениям
+  - Примеры: AWS NLB, HAProxy в TCP режиме
+  - Когда: финансовые транзакции, игры, стриминг
+
+L7 (Application Layer) — балансировка по HTTP:
+  - Видит URL, заголовки, cookies
+  - Может маршрутизировать по пути: /payments → payment-service
+  - SSL termination (расшифровывает HTTPS здесь, дальше HTTP)
+  - Rate limiting, WAF, A/B тестирование
+  - Примеры: Nginx, HAProxy, AWS ALB, Traefik
+  - Когда: веб-приложения, API, микросервисы
+
+─── 3.2 NGINX КАК LOAD BALANCER / REVERSE PROXY ────────────────────────────────
+
+# /etc/nginx/nginx.conf
+
+worker_processes auto;
+events {
+    worker_connections 4096;
+    use epoll;          # Эффективная обработка соединений на Linux
+    multi_accept on;
+}
+
+http {
+    # === UPSTREAM (пул серверов приложений) ===
+    upstream bank_app {
+        # Алгоритм балансировки:
+        # (по умолчанию — round-robin)
+        # least_conn;    # Наименьшее количество активных соединений
+        # ip_hash;       # Sticky sessions (клиент → всегда один сервер)
+        # hash $request_uri consistent;   # По URI (для кеша)
+
+        server 10.0.30.10:8080 weight=3;   # Более мощный сервер
+        server 10.0.30.11:8080 weight=2;
+        server 10.0.30.12:8080 weight=1;
+        server 10.0.30.13:8080 backup;     # Включается если все упали
+
+        keepalive 32;       # Пул HTTP keep-alive соединений
+    }
+
+    # === CACHING ===
+    proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=api_cache:10m
+                     max_size=1g inactive=60m use_temp_path=off;
+
+    # === RATE LIMITING ===
+    limit_req_zone $binary_remote_addr zone=api:10m rate=100r/m;
+    limit_conn_zone $binary_remote_addr zone=conn:10m;
+
+    # === HTTPS сервер ===
+    server {
+        listen 443 ssl http2;
+        server_name api.bank.ru;
+
+        ssl_certificate     /etc/ssl/certs/bank.crt;
+        ssl_certificate_key /etc/ssl/private/bank.key;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+        ssl_session_cache   shared:SSL:10m;
+        ssl_session_timeout 1d;
+        ssl_stapling        on;
+
+        # Security headers
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Frame-Options DENY always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-XSS-Protection "1; mode=block" always;
+
+        # Логирование
+        access_log /var/log/nginx/bank_access.log;
+        error_log  /var/log/nginx/bank_error.log warn;
+
+        # Rate limiting
+        limit_req zone=api burst=20 nodelay;
+        limit_conn conn 50;
+
+        # === Маршрутизация по пути ===
+        location /api/payments {
+            proxy_pass http://bank_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Timeouts
+            proxy_connect_timeout 5s;
+            proxy_read_timeout    30s;
+            proxy_send_timeout    30s;
+
+            # Не кешировать платежи!
+            proxy_no_cache 1;
+            proxy_cache_bypass 1;
+        }
+
+        location /api/accounts {
+            proxy_pass http://bank_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+
+            # Кешировать GET запросы на 10 секунд
+            proxy_cache api_cache;
+            proxy_cache_valid 200 10s;
+            proxy_cache_methods GET;
+            proxy_cache_bypass $http_pragma $http_authorization;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # Health check (не логировать)
+        location /health {
+            access_log off;
+            proxy_pass http://bank_app;
+        }
+
+        # Отдаём статику напрямую (не через backend)
+        location /static {
+            root /var/www/bank;
+            expires 30d;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+
+    # HTTP → HTTPS redirect
+    server {
+        listen 80;
+        server_name api.bank.ru;
+        return 301 https://$host$request_uri;
+    }
+}
+
+─── 3.3 АЛГОРИТМЫ БАЛАНСИРОВКИ ─────────────────────────────────────────────────
+
+Round Robin:
+  Запрос 1 → Server A
+  Запрос 2 → Server B
+  Запрос 3 → Server C
+  Запрос 4 → Server A  (цикл)
+  + Простота  - Не учитывает загрузку сервера
+
+Weighted Round Robin:
+  Server A weight=3, Server B weight=1
+  → A, A, A, B, A, A, A, B...
+  + Учитывает производительность серверов
+
+Least Connections:
+  Новый запрос → сервер с минимальным числом активных соединений
+  + Лучше при долгих запросах (загрузка файлов, WebSocket)
+
+IP Hash / Sticky Sessions:
+  hash(client_ip) % N → всегда один сервер для клиента
+  + Нужно если сессия хранится на сервере (stateful)
+  - Неравномерная нагрузка, проблемы при масштабировании
+  Решение: хранить сессии в Redis, а не на серверах!
+
+Least Response Time:
+  Новый запрос → сервер с наименьшим avg временем ответа
+  + Умная адаптивная балансировка
+
+─── 3.4 HEALTH CHECKS ──────────────────────────────────────────────────────────
+
+Балансировщик регулярно проверяет серверы.
+Если сервер не отвечает — убирает из ротации автоматически.
+
+Active Health Check (балансировщик сам спрашивает):
+  GET /actuator/health каждые 10 секунд
+  200 OK → сервер здоров
+  5xx или таймаут → убрать из пула, alert DevOps
+
+Passive Health Check (по реальным запросам):
+  Если 3 подряд ошибки от клиента → пометить сервер нездоровым
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 4: VPN — ВИРТУАЛЬНЫЕ ЧАСТНЫЕ СЕТИ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 4.1 ТИПЫ VPN ───────────────────────────────────────────────────────────────
+
+REMOTE ACCESS VPN (Клиент-сервер):
+  Разработчик из дома → VPN клиент → зашифрованный туннель → корпоративная сеть
+  Ты: OpenVPN / WireGuard клиент на ноутбуке
+  Сервер в офисе: VPN сервер (тот же OpenVPN)
+  После подключения: твой ноутбук получает 10.0.50.x адрес
+  Можно подключиться к: postgres.corp (10.0.40.5), redis.corp (10.0.40.6)
+
+SITE-TO-SITE VPN:
+  Офис Москва ←── зашифрованный туннель ──→ Офис Питер
+  Устройства в разных офисах видят друг друга как одну сеть
+  Реализация: Cisco ASA, pfSense, AWS Site-to-Site VPN
+
+SPLIT TUNNELING:
+  Без split tunneling: ВЕСЬ трафик идёт через VPN (медленнее)
+  С split tunneling: только корпоративные подсети через VPN, остальное — напрямую
+  Пример: 10.0.0.0/8 → через VPN, всё остальное → напрямую
+
+─── 4.2 ПРОТОКОЛЫ VPN ──────────────────────────────────────────────────────────
+
+OpenVPN:
+  - Проверенный, надёжный, кроссплатформенный
+  - SSL/TLS основе, порт 1194 UDP (или 443 TCP)
+  - Чуть сложнее в настройке
+  - Стандарт для корпораций
+
+WireGuard:
+  - Новый (2020), очень быстрый, ~4000 строк кода (vs ~100k у OpenVPN)
+  - UDP порт 51820
+  - Простая конфигурация (ключевые пары)
+  - Нарастает популярность в банках
+
+IPSec / IKEv2:
+  - Встроен в Windows/macOS/iOS
+  - Быстрый, хорошо для мобильных клиентов
+  - Порт 500 UDP, 4500 UDP
+
+─── 4.3 WIREGUARD КОНФИГУРАЦИЯ ─────────────────────────────────────────────────
+
+# Сервер: /etc/wireguard/wg0.conf
+[Interface]
+Address = 10.8.0.1/24
+ListenPort = 51820
+PrivateKey = <SERVER_PRIVATE_KEY>
+PostUp   = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+[Peer]   # Разработчик Данил
+PublicKey = <DANIL_PUBLIC_KEY>
+AllowedIPs = 10.8.0.2/32   # Этот peer получит этот IP
+
+[Peer]   # CI/CD runner
+PublicKey = <CICD_PUBLIC_KEY>
+AllowedIPs = 10.8.0.3/32
+
+# Клиент (разработчик): /etc/wireguard/wg0.conf
+[Interface]
+Address = 10.8.0.2/32
+PrivateKey = <DANIL_PRIVATE_KEY>
+DNS = 10.0.10.5   # Корпоративный DNS
+
+[Peer]
+PublicKey = <SERVER_PUBLIC_KEY>
+Endpoint = vpn.bank.ru:51820
+AllowedIPs = 10.0.0.0/8    # Только корпоративная сеть через VPN (split tunneling)
+PersistentKeepalive = 25    # Поддерживать соединение за NAT
+
+# Запуск:
+wg-quick up wg0    # Подключиться
+wg-quick down wg0  # Отключиться
+wg show            # Статус соединения
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 5: МЕЖСЕТЕВЫЕ ЭКРАНЫ (FIREWALL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 5.1 ТИПЫ FIREWALL ──────────────────────────────────────────────────────────
+
+Stateless Packet Filter (L3/L4):
+  Проверяет каждый пакет независимо по правилам (IP, порт, протокол).
+  Быстро, но не понимает контекст TCP соединения.
+
+Stateful Firewall (современный стандарт):
+  Отслеживает состояние соединений (connection tracking).
+  "Это ответный пакет на исходящий запрос" — пропустить.
+  Примеры: iptables/nftables (Linux), pf (BSD), AWS Security Groups.
+
+NGFW — Next Generation Firewall:
+  + DPI (Deep Packet Inspection) — анализ содержимого пакетов
+  + Application awareness (знает что это Netflix, не просто порт 443)
+  + IDS/IPS интеграция
+  + URL filtering
+  Примеры: Palo Alto Networks, Fortinet, Cisco Firepower
+
+WAF — Web Application Firewall (специализированный):
+  Работает на L7 (HTTP).
+  Защищает от: SQL injection, XSS, CSRF, DDoS, OWASP Top 10.
+  Примеры: Nginx ModSecurity, AWS WAF, Cloudflare.
+
+─── 5.2 IPTABLES (Linux Firewall) ──────────────────────────────────────────────
+
+# Посмотреть текущие правила:
+iptables -L -n -v --line-numbers
+iptables -t nat -L -n -v
+
+# Базовые правила для банковского сервера приложений:
+# (выполнять от root)
+
+# Очистить все правила:
+iptables -F
+iptables -X
+
+# Политики по умолчанию — DROP всё:
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT    # Исходящий — разрешить
+
+# Разрешить loopback:
+iptables -A INPUT -i lo -j ACCEPT
+
+# Разрешить ESTABLISHED соединения (ответы на наши запросы):
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# SSH только с jump-host (10.0.10.100):
+iptables -A INPUT -p tcp --dport 22 -s 10.0.10.100 -j ACCEPT
+
+# HTTP/HTTPS только с load balancer (10.0.20.50):
+iptables -A INPUT -p tcp --dport 8080 -s 10.0.20.50 -j ACCEPT
+
+# Actuator health check только от балансировщика:
+iptables -A INPUT -p tcp --dport 8080 -s 10.0.20.51 -j ACCEPT
+
+# Метрики только от Prometheus (10.0.11.10):
+# (Prometheus тянет /actuator/prometheus)
+iptables -A INPUT -p tcp --dport 8080 -s 10.0.11.10 -j ACCEPT
+
+# Логировать и дропать остальное:
+iptables -A INPUT -j LOG --log-prefix "IPTABLES-DROP: " --log-level 7
+iptables -A INPUT -j DROP
+
+# Сохранить правила:
+iptables-save > /etc/iptables/rules.v4
+# При перезагрузке: iptables-restore < /etc/iptables/rules.v4
+
+─── 5.3 NAT (NETWORK ADDRESS TRANSLATION) ──────────────────────────────────────
+
+NAT позволяет множеству устройств выходить в интернет через один публичный IP.
+
+SNAT (Source NAT) — изменяет source IP исходящего пакета:
+  Сервер 10.0.30.10 → [Router] → 1.2.3.4 (публичный IP банка) → Интернет
+  Ответ: Интернет → 1.2.3.4 → [Router восстанавливает сессию] → 10.0.30.10
+
+DNAT (Destination NAT) — изменяет destination IP входящего пакета:
+  Клиент → bank.ru (1.2.3.4:443) → [DNAT] → 10.0.20.50:443 (nginx)
+  Это то, как публичный IP направляет трафик на внутренние серверы.
+
+Пример DNAT в iptables:
+  iptables -t nat -A PREROUTING -p tcp -d 1.2.3.4 --dport 443 -j DNAT \
+    --to-destination 10.0.20.50:443
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 6: CDN И REVERSE PROXY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 6.1 CDN (CONTENT DELIVERY NETWORK) ─────────────────────────────────────────
+
+CDN — сеть серверов по всему миру, кешируют статический контент рядом с пользователем.
+
+Клиент в Новосибирске запрашивает логотип банка:
+  Без CDN: Новосибирск → Москва (5000km) → ответ → задержка ~50ms
+  С CDN: Новосибирск → Новосибирский POP CDN (~100km) → ответ ~5ms
+
+Что кешировать в CDN:
+  ✓ Статические файлы (JS, CSS, изображения, PDF выписки)
+  ✓ Публичные API ответы (курсы валют — раз в минуту)
+  ✗ Персональные данные (баланс, транзакции)
+  ✗ Авторизованные запросы
+  ✗ Динамика (платежи, переводы)
+
+Крупные CDN провайдеры:
+  Cloudflare — + бесплатный план + WAF + DDoS защита
+  AWS CloudFront — интеграция с другими AWS сервисами
+  Akamai — enterprise, банки, страховые
+  Qrator (Россия) — популярен у российских банков (DDoS защита)
+
+Cache-Control заголовки для CDN:
+  Cache-Control: public, max-age=86400, immutable   # Статика: 24 часа
+  Cache-Control: no-store                            # Никогда не кешировать
+  Cache-Control: private, max-age=0                  # Только браузер, не CDN
+  Surrogate-Control: max-age=3600                    # Только для CDN (Varnish)
+
+─── 6.2 REVERSE PROXY VS FORWARD PROXY ─────────────────────────────────────────
+
+FORWARD PROXY:
+  Клиент → [Forward Proxy] → Интернет
+  Клиент настраивает прокси.
+  Используется для: обход блокировок, анонимизация, корпоративный контроль.
+
+REVERSE PROXY:
+  Клиент → [Reverse Proxy] → Backend серверы
+  Клиент не знает о прокси — он думает что общается с bank.ru напрямую.
+  Используется для: SSL termination, балансировка, кеширование, защита.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 7: SERVICE MESH (ISTIO / LINKERD)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 7.1 ЧТО ТАКОЕ SERVICE MESH ─────────────────────────────────────────────────
+
+Service Mesh решает проблему коммуникации между микросервисами.
+
+БЕЗ Service Mesh — каждый сервис сам отвечает за:
+  - Retry при сбоях
+  - Circuit breaking
+  - mTLS (взаимная аутентификация)
+  - Трейсинг
+  - Метрики
+  Проблема: логика сети в коде каждого сервиса = дублирование.
+
+С Service Mesh — SIDECAR PROXY рядом с каждым контейнером:
+  payment-service + [envoy-proxy]
+                         ↕ перехватывает весь трафик
+  account-service  + [envoy-proxy]
+
+  Все сетевые задачи решаются на уровне proxy, не кода.
+
+─── 7.2 ВОЗМОЖНОСТИ ISTIO ───────────────────────────────────────────────────────
+
+TRAFFIC MANAGEMENT:
+  VirtualService — гибкая маршрутизация:
+    # 90% трафика → payment-service:v1, 10% → payment-service:v2 (canary)
+    apiVersion: networking.istio.io/v1alpha3
+    kind: VirtualService
+    metadata:
+      name: payment-service
+    spec:
+      hosts: [payment-service]
+      http:
+        - route:
+            - destination:
+                host: payment-service
+                subset: v1
+              weight: 90
+            - destination:
+                host: payment-service
+                subset: v2
+              weight: 10
+
+  DestinationRule — circuit breaker:
+    apiVersion: networking.istio.io/v1alpha3
+    kind: DestinationRule
+    metadata:
+      name: payment-service
+    spec:
+      host: payment-service
+      trafficPolicy:
+        outlierDetection:
+          consecutive5xxErrors: 5        # 5 ошибок → выключить сервер
+          interval: 30s
+          baseEjectionTime: 30s
+          maxEjectionPercent: 50         # Не выключать больше 50%
+        connectionPool:
+          tcp:
+            maxConnections: 100
+          http:
+            http1MaxPendingRequests: 50
+            maxRequestsPerConnection: 10
+
+SECURITY (mTLS):
+  # Включить mTLS для всего namespace:
+  apiVersion: security.istio.io/v1beta1
+  kind: PeerAuthentication
+  metadata:
+    name: default
+    namespace: banking
+  spec:
+    mtls:
+      mode: STRICT   # Только mTLS, HTTP запрещён
+
+  # Политики авторизации:
+  apiVersion: security.istio.io/v1beta1
+  kind: AuthorizationPolicy
+  metadata:
+    name: payment-db-access
+    namespace: banking
+  spec:
+    selector:
+      matchLabels:
+        app: postgres
+    rules:
+      - from:
+          - source:
+              principals: ["cluster.local/ns/banking/sa/payment-service"]
+        to:
+          - operation:
+              ports: ["5432"]
+
+OBSERVABILITY:
+  Автоматически собирает метрики, трейсы, логи для всех сервисов
+  без изменения кода. Интеграция с Prometheus, Jaeger, Kiali.
+
+─── 7.3 КОГДА НУЖЕН SERVICE MESH ───────────────────────────────────────────────
+
+Нужен при:
+  - 10+ микросервисов
+  - Требования по безопасности mTLS между сервисами
+  - Нужен canary deployment или A/B тестирование
+  - Сложные политики трафика
+
+НЕ нужен при:
+  - Монолит или 3-5 сервисов
+  - Стартап (overhead не оправдан)
+  - Команда не готова к сложности
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 8: СЕТЕВАЯ БЕЗОПАСНОСТЬ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 8.1 DDoS АТАКИ И ЗАЩИТА ────────────────────────────────────────────────────
+
+ТИПЫ DDoS:
+  Volumetric — заполнить канал (Gbps трафик). UDP flood, ICMP flood.
+  Protocol   — исчерпать ресурсы (SYN flood, Ping of Death).
+  Application — перегрузить приложение (HTTP flood, Slowloris).
+
+ЗАЩИТА:
+
+1. Cloudflare / Qrator — DDoS Scrubbing Center:
+   Трафик сначала идёт на scrubbing center (10 Tbps+ защита).
+   Атакующий трафик отфильтровывается.
+   Чистый трафик → твои серверы.
+
+2. Rate Limiting на уровне приложения:
+   # Spring Boot с Bucket4j + Redis
+   @RateLimiter(name = "transfers", fallbackMethod = "rateLimitFallback")
+   public TransferResult transfer(TransferRequest req) { ... }
+
+   # Или в Nginx:
+   limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+   limit_req zone=api burst=20 nodelay;
+
+3. SYN Cookies (защита от SYN flood):
+   sysctl -w net.ipv4.tcp_syncookies=1
+
+4. Connection Limits:
+   iptables -A INPUT -p tcp --dport 80 -m connlimit --connlimit-above 50 -j REJECT
+
+─── 8.2 IDS/IPS ────────────────────────────────────────────────────────────────
+
+IDS (Intrusion Detection System) — обнаруживает атаки, сигнализирует.
+IPS (Intrusion Prevention System) — обнаруживает И блокирует.
+
+Snort / Suricata — популярные open-source IDS/IPS:
+  - Анализируют сетевой трафик в реальном времени
+  - Сигнатурный анализ (известные атаки)
+  - Аномальный анализ (нетипичное поведение)
+  - Интеграция с SIEM (Security Information and Event Management)
+
+Пример правила Snort:
+  alert tcp any any -> $HTTP_SERVERS $HTTP_PORTS (
+      msg:"SQL Injection Attempt";
+      content:"UNION SELECT";
+      nocase;
+      sid:1000001;
+  )
+
+─── 8.3 СЕТЕВЫЕ АТАКИ КОТОРЫЕ ДОЛЖЕН ЗНАТЬ РАЗРАБОТЧИК ─────────────────────────
+
+Man-in-the-Middle (MITM):
+  Атакующий перехватывает трафик между клиентом и сервером.
+  Защита: HTTPS/TLS, HSTS, Certificate Pinning (мобильные приложения).
+
+DNS Spoofing / Cache Poisoning:
+  Атакующий подменяет DNS ответы.
+  Защита: DNSSEC (цифровые подписи DNS записей).
+
+ARP Spoofing:
+  Атакующий в локальной сети подменяет MAC адреса (L2 атака).
+  Защита: Dynamic ARP Inspection на коммутаторах, VPN.
+
+Port Scanning:
+  Атакующий ищет открытые порты.
+  Защита: Закрыть всё что не нужно, honeypot, IDS.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 9: СЕТЕВЫЕ ИНСТРУМЕНТЫ РАЗРАБОТЧИКА
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── 9.1 ДИАГНОСТИКА ────────────────────────────────────────────────────────────
+
+PING — проверка доступности:
+  ping -c 4 8.8.8.8              # 4 пакета
+  ping -i 0.2 -c 100 server.ru  # Быстрый пинг 100 раз
+
+TRACEROUTE — путь пакетов:
+  traceroute google.com          # Linux
+  tracert google.com             # Windows
+  mtr google.com                 # Интерактивный (лучше)
+
+NETSTAT / SS — открытые соединения:
+  ss -tulpn                      # Все открытые порты и процессы
+  ss -tnp state established      # Установленные TCP соединения
+  netstat -s                     # Статистика протоколов
+
+NMAP — сканирование портов:
+  nmap -sV 192.168.1.10          # Сканировать сервер (определить сервисы)
+  nmap -p 1-1000 192.168.1.0/24  # Сканировать подсеть
+  (ТОЛЬКО на своих серверах!)
+
+TCPDUMP — анализ трафика:
+  tcpdump -i eth0 port 8080      # Трафик на порту 8080
+  tcpdump -i eth0 host 10.0.40.5 # Трафик с/на конкретный IP
+  tcpdump -i eth0 -w dump.pcap   # Сохранить в файл (открыть в Wireshark)
+
+CURL — HTTP запросы:
+  curl -v https://api.bank.ru/health          # Verbose (заголовки)
+  curl -X POST -H "Content-Type: application/json" \
+       -H "Authorization: Bearer $TOKEN" \
+       -d '{"amount": 1000}' \
+       https://api.bank.ru/transfers
+
+  curl -o /dev/null -s -w "%{time_total}" https://api.bank.ru/  # Время ответа
+
+  curl --resolve api.bank.ru:443:10.0.20.50 https://api.bank.ru/  # Обойти DNS
+
+HTTPIE — удобнее чем curl:
+  http POST api.bank.ru/transfers amount=1000 Authorization:"Bearer token"
+
+─── 9.2 ДИАГНОСТИКА ПРОБЛЕМ В PRODUCTION ───────────────────────────────────────
+
+СЦЕНАРИЙ: "Приложение не отвечает!"
+
+1. Проверить доступность:
+   ping app-server
+   curl -v http://app-server:8080/health
+
+2. Проверить порты:
+   ss -tulpn | grep 8080      # Слушает ли приложение?
+   netstat -an | grep ESTABLISHED | wc -l  # Сколько соединений?
+
+3. Проверить процесс:
+   ps aux | grep java
+   top / htop                 # CPU / Memory
+
+4. Смотреть логи:
+   journalctl -u bank-app -f
+   tail -f /var/log/app.log | grep -E "ERROR|WARN"
+
+5. Проверить дисковое место:
+   df -h                      # Если /var заполнен — логи!
+
+6. Проверить сеть:
+   ss -s                      # Сводная статистика TCP
+   cat /proc/net/sockstat     # Детали сокетов
+
+7. Проверить базу:
+   psql -c "SELECT count(*) FROM pg_stat_activity"  # Все ли соединения
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 10: КАК ЗАПРОС ПРОХОДИТ ЧЕРЕЗ БАНКОВСКУЮ ИНФРАСТРУКТУРУ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Клиент делает перевод в мобильном приложении:
+
+  [Мобильный клиент]
+       │ HTTPS POST /api/v2/transfers
+       │ Host: api.bank.ru
+       │ Authorization: Bearer eyJhb...
+       ▼
+  [Cloudflare/Qrator] ← DDoS защита, WAF, TLS termination
+       │ Чистый HTTPS трафик
+       ▼
+  [DNS → 1.2.3.4 (VIP)] → DNAT → [HAProxy / Nginx — L4 балансировщик]
+       │ Round-robin или least-conn
+       │ SSL termination (HTTPS → HTTP внутри)
+       ▼
+  [Nginx — L7 reverse proxy]  10.0.20.50
+       │ Проверяет rate limits
+       │ Маршрутизирует: /api/v2/transfers → transfer-service
+       │ X-Real-IP, X-Forwarded-For заголовки
+       ▼
+  [Istio Ingress Gateway]  (если K8s)
+       │ mTLS между сервисами
+       │ Трейсинг запроса (TraceID генерируется здесь)
+       ▼
+  [API Gateway (Kong)]  10.0.30.5
+       │ JWT аутентификация
+       │ Rate limiting по пользователю
+       │ Логирование всех запросов
+       ▼
+  [Transfer Service Pod]  10.96.0.50
+       │ Spring Boot обрабатывает запрос
+       │ @PreAuthorize("hasRole('USER')")
+       │ Идемпотентность: проверить Redis
+       │ НАЧАЛО ТРАНЗАКЦИИ
+       ▼
+  [Account Service Pod]  10.96.0.51  ← gRPC вызов
+       │ Проверить баланс
+       │ Списать средства
+       │
+       ├──► [PostgreSQL Primary]  10.0.40.5:5432
+       │       ВLOCKED: SELECT FOR UPDATE
+       │       UPDATE accounts SET balance = balance - 1000
+       │
+       └──► [Redis]  10.0.40.10:6379
+               SET idempotency_key:TRN-123 "processed" EX 86400
+       │
+       ▼
+  [Notification Service]  ← Kafka сообщение (асинхронно)
+       │ SMS/Push уведомление
+       │
+  [Transfer Service] → Ответ 200 OK
+       │
+       ▼
+  [Nginx] → [Клиент]
+  Весь путь: ~50-200ms
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 11: ВОПРОСЫ НА СОБЕСЕДОВАНИИ ПО СЕТЯМ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Q: Что происходит когда ты вводишь google.com в браузер?
+A: 1. Браузер проверяет кеш DNS
+   2. ОС проверяет /etc/hosts
+   3. Рекурсивный DNS резолвер → root → TLD → авторитативный
+   4. Получаем IP (например 142.250.185.46)
+   5. TCP three-way handshake (SYN → SYN-ACK → ACK)
+   6. TLS handshake (ClientHello → ServerHello → обмен сертификатами → ключи)
+   7. HTTP GET / HTTP/2
+   8. Браузер рендерит HTML, запрашивает дополнительные ресурсы
+
+Q: Чем TCP отличается от UDP?
+A: TCP: надёжный, упорядоченный, с подтверждениями. Для HTTP, БД, API.
+   UDP: ненадёжный, без гарантий. Для DNS, видеостриминга, gaming.
+   TCP медленнее из-за overhead, UDP быстрее.
+
+Q: Что такое NAT и зачем он нужен?
+A: Network Address Translation — замена IP адресов в пакетах.
+   Нужен потому что IPv4 адресов не хватает.
+   Много устройств за NAT видны снаружи как один публичный IP.
+
+Q: Что такое SSL/TLS handshake?
+A: 1. ClientHello — поддерживаемые шифры, версия TLS, случайные байты
+   2. ServerHello — выбранный шифр + сертификат (публичный ключ)
+   3. Клиент проверяет сертификат по цепочке CA
+   4. Обмен ключами (ECDHE — ephemeral, нет forward secrecy в RSA)
+   5. Оба стороны вычисляют session key
+   6. Finished — подтверждение зашифрованного канала
+   Всё дальнейшее шифруется симметрично (AES-GCM).
+
+Q: Что такое CORS и как он работает?
+A: Cross-Origin Resource Sharing — браузерная политика безопасности.
+   Браузер не позволяет JS на evil.com делать запросы к api.bank.ru.
+   Preflight: OPTIONS запрос → сервер отвечает разрешёнными origins.
+   Access-Control-Allow-Origin: https://app.bank.ru
+   Работает ТОЛЬКО в браузере! curl не проверяет CORS.
+
+Q: Зачем нужен reverse proxy?
+A: - Скрыть внутренние серверы (безопасность)
+   - SSL termination в одном месте
+   - Балансировка нагрузки
+   - Кеширование
+   - Rate limiting
+   - Сжатие (gzip)
+
+Q: Как работает DNS round-robin?
+A: Несколько A записей для одного домена:
+   bank.ru → 1.2.3.4
+   bank.ru → 5.6.7.8
+   DNS возвращает их по очереди.
+   Это L3 балансировка, но без health checks!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ★ ЗАДАНИЯ ДЛЯ ТЕБЯ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ПРАКТИКА С ИНСТРУМЕНТАМИ:
+   - Запусти: traceroute google.com, посмотри сколько хопов
+   - Запусти: nmap -sV localhost (просканируй свою машину)
+   - Посмотри: ss -tulpn на своей машине — какие порты открыты?
+   - Разбери: curl -v https://google.com — найди TLS handshake, заголовки
+
+2. NGINX КОНФИГУРАЦИЯ:
+   Настрой Nginx который:
+   - Принимает HTTPS на 443 (самоподписанный сертификат через openssl)
+   - Перенаправляет HTTP → HTTPS
+   - Проксирует /api → localhost:8080 (твоё Spring Boot)
+   - Добавь rate limit: 100 запросов/минуту
+
+3. DOCKER СЕТИ:
+   docker network create bank-network
+   Запусти PostgreSQL и Spring Boot в этой сети.
+   Убедись что Spring Boot может достучаться до postgres по имени хоста "postgres".
+
+4. ПОНЯТЬ VLAN:
+   Нарисуй архитектуру сети для банка с 3 зонами:
+   - DMZ (nginx, API GW)
+   - Application (spring boot микросервисы)
+   - Data (PostgreSQL, Redis)
+   Определи правила firewall между зонами.
+
+5. ПРОЕКТ: написать программу
+   Напиши Java класс который:
+   - Делает HTTP запрос с таймаутом 5 секунд
+   - Ретраит 3 раза с exponential backoff
+   - Логирует IP адрес, latency, статус
+   - Поддерживает circuit breaker (Resilience4j)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ГЛОССАРИЙ СЕТЕВЫХ ТЕРМИНОВ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Bandwidth   — пропускная способность (Mbps, Gbps)
+Latency     — задержка (время доставки одного пакета, ms)
+Throughput  — реальная скорость передачи данных (меньше bandwidth)
+Jitter      — вариация задержки (критично для VoIP)
+Packet Loss — % потерянных пакетов (должно быть 0%)
+RTT         — Round-Trip Time (ping)
+MTU         — Maximum Transmission Unit (обычно 1500 байт для Ethernet)
+VIP         — Virtual IP (плавающий IP адрес для HA)
+BGP         — Border Gateway Protocol (маршрутизация в интернете)
+AS          — Autonomous System (Сбер, Google, провайдер — у каждого свой AS)
+Peering     — прямой обмен трафиком между AS (дешевле транзита)
+IX          — Internet Exchange (точка обмена трафиком MSK-IX, DE-CIX)
+MPLS        — Multi-Protocol Label Switching (технология WAN у провайдеров)
+QoS         — Quality of Service (приоритизация трафика: VoIP > HTTP)
+anycast     — один IP → ближайший из многих серверов (используют CDN, DNS)
+multicast   — один пакет → группе получателей
+unicast     — один → одному
+broadcast   — один → всем в подсети

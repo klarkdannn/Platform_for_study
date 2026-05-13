@@ -1,0 +1,192 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║              СЛАЙДЫ: ООП — ОБЪЕКТНО-ОРИЕНТИРОВАННОЕ                 ║
+║              ПРОГРАММИРОВАНИЕ НА ПРИМЕРЕ БАНКА                       ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 1: 4 столпа ООП — на примере банка
+────────────────────────────────────────────────────────────────────────
+
+    ┌──────────────────┬─────────────────────────────────────────────┐
+    │ Принцип          │ В банке                                     │
+    ├──────────────────┼─────────────────────────────────────────────┤
+    │ Инкапсуляция     │ Нельзя напрямую изменить balance            │
+    │                  │ Только через deposit() / withdraw()          │
+    ├──────────────────┼─────────────────────────────────────────────┤
+    │ Наследование     │ DebitAccount extends Account                │
+    │                  │ Переиспользует общий код Account            │
+    ├──────────────────┼─────────────────────────────────────────────┤
+    │ Полиморфизм      │ account.withdraw() работает по-разному       │
+    │                  │ для Debit (не уйти в минус)                  │
+    │                  │ и Credit (можно до -limitAmount)             │
+    ├──────────────────┼─────────────────────────────────────────────┤
+    │ Абстракция       │ abstract class Account — нельзя создать     │
+    │                  │ "просто счёт", только конкретный тип        │
+    └──────────────────┴─────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 2: Инкапсуляция — зачем private поля?
+────────────────────────────────────────────────────────────────────────
+
+    // ПЛОХО — поле публичное, можно случайно сломать данные:
+    class Account {
+        public BigDecimal balance; // опасно!
+    }
+    account.balance = new BigDecimal("-99999999"); // катастрофа!
+
+    // ХОРОШО — через методы с проверкой:
+    class Account {
+        private BigDecimal balance;
+
+        public void deposit(BigDecimal amount) {
+            if (amount.compareTo(BigDecimal.ZERO) <= 0)
+                throw new IllegalArgumentException("Сумма должна быть > 0");
+            this.balance = this.balance.add(amount);
+            // + запись в историю транзакций
+            // + уведомления
+            // + аудит
+        }
+    }
+
+    Инкапсуляция = контроль + безопасность + гибкость изменения
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 3: Наследование — цепочка в банке
+────────────────────────────────────────────────────────────────────────
+
+    Object
+      └── Account (abstract)
+            ├── DebitAccount    (нельзя уйти в минус)
+            ├── SavingsAccount  (начисляются проценты)
+            └── CreditAccount   (можно уйти в минус до -limit)
+
+    // super() — обязательно вызывать конструктор родителя:
+    class DebitAccount extends Account {
+        public DebitAccount(String clientId, BigDecimal balance) {
+            super(clientId, balance, Currency.RUB); // вызываем Account()
+        }
+    }
+
+    // Методы родителя в подклассе:
+    @Override
+    public void withdraw(BigDecimal amount, String desc) {
+        validateOperation(amount);    // метод из Account
+        // + доп. логика Debit:
+        if (amount.compareTo(dailyLimit) > 0) throw new ...;
+        super.withdraw(amount, desc); // вызов родительского withdraw
+    }
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 4: Полиморфизм — один метод, разное поведение
+────────────────────────────────────────────────────────────────────────
+
+    Account account; // переменная типа РОДИТЕЛЯ
+
+    account = new DebitAccount("CLI001", new BigDecimal("50000"));
+    account.withdraw(new BigDecimal("1000"), "покупка"); // ограничен балансом
+
+    account = new CreditAccount("CLI001", BigDecimal.ZERO,
+                                new BigDecimal("100000"), 24.0);
+    account.withdraw(new BigDecimal("60000"), "кредит"); // уходит в -60000
+
+    // ОДИН метод withdraw(), но РАЗНОЕ поведение!
+    // Java вызывает метод РЕАЛЬНОГО объекта (динамическое связывание)
+
+    // Практическое применение:
+    List<Account> allAccounts = bank.getAllAccounts();
+    for (Account acc : allAccounts) {
+        if (acc instanceof SavingsAccount savings) {
+            savings.accrueInterest(); // только для накопительных
+        }
+    }
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 5: Паттерн Builder — зачем?
+────────────────────────────────────────────────────────────────────────
+
+    // ПРОБЛЕМА: слишком много конструкторов
+    new Client("Алиса", "alice@mail.ru", null, null, null, true);
+    // Что есть null? Непонятно!
+
+    // РЕШЕНИЕ: Builder
+    Client alice = new Client.Builder("Алиса Иванова")
+        .email("alice@mail.ru")
+        .phone("+79001234567")
+        .passport("4506 123456")
+        .dateOfBirth(LocalDate.of(1990, 5, 15))
+        .build();
+
+    // Плюсы Builder:
+    ✓ Только обязательные параметры в конструкторе
+    ✓ Необязательные — через методы-цепочки
+    ✓ Читабельно
+    ✓ Неизменяемый объект после build()
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 6: Interface vs Abstract Class — шпаргалка
+────────────────────────────────────────────────────────────────────────
+
+    ┌────────────────────────┬──────────────────┬─────────────────────┐
+    │ Характеристика         │ Interface        │ Abstract Class      │
+    ├────────────────────────┼──────────────────┼─────────────────────┤
+    │ Поля (state)           │ только static    │ любые               │
+    │ Конструктор            │ НЕТ              │ есть                │
+    │ Методы по умолчанию    │ default методы   │ любые               │
+    │ Наследование           │ implements много │ extends один        │
+    │ Зачем                  │ "может делать"   │ "является чем-то"   │
+    └────────────────────────┴──────────────────┴─────────────────────┘
+
+    Примеры в проекте:
+    interface Transferable { deposit(); withdraw(); }  → "может переводить"
+    interface Auditable    { getHistory(); }            → "можно аудировать"
+    abstract Account       → "является счётом"         → общее состояние
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 7: Exceptions — правильная обработка в банке
+────────────────────────────────────────────────────────────────────────
+
+    Иерархия:
+    Throwable
+      ├── Error (не ловить! OutOfMemoryError, StackOverflowError)
+      └── Exception
+            ├── IOException (checked — надо обрабатывать)
+            └── RuntimeException (unchecked — не обязательно)
+                  ├── NullPointerException
+                  ├── IllegalArgumentException
+                  └── InsufficientFundsException (наш кастомный)
+
+    // В банке: цепочка исключений
+    try {
+        bank.transfer(from, to, amount, desc);
+    } catch (InsufficientFundsException e) {
+        // бизнес-ошибка: не хватает денег
+        return ResponseEntity.badRequest().body(e.getMessage());
+    } catch (AccountBlockedException e) {
+        // счёт заблокирован
+        return ResponseEntity.status(403).body(e.getMessage());
+    } catch (Exception e) {
+        // неожиданная ошибка — логируем и отвечаем 500
+        log.error("Unexpected error during transfer", e);
+        return ResponseEntity.internalServerError().build();
+    }
+
+────────────────────────────────────────────────────────────────────────
+СЛАЙД 8: Задания по ООП
+────────────────────────────────────────────────────────────────────────
+
+    [ ] 1. Добавь в Client поле dateOfBirth и метод getAge()
+           Используй Period.between(dateOfBirth, LocalDate.now()).getYears()
+
+    [ ] 2. Создай класс ChildSavingsAccount extends SavingsAccount:
+           - Повышенная ставка (+2%)
+           - Снятие только после 18 лет
+           - Поле parentClientId
+
+    [ ] 3. Реализуй интерфейс Printable с методом printStatement()
+           Реализуй его в DebitAccount (распечатка выписки по счёту)
+
+    [ ] 4. Добавь enum CardType: VISA, MASTERCARD, MIR
+           - cashbackPercent: MIR=1%, VISA=0.5%, MASTERCARD=0.7%
+           - Метод calcCashback(BigDecimal amount)
+
+    [ ] 5. В класс Transaction создай вложенный класс Builder

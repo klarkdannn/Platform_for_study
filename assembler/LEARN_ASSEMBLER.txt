@@ -1,0 +1,368 @@
+================================================================================
+  ЯЗЫК АССЕМБЛЕРА — ОТ НУЛЯ ДО ПОНИМАНИЯ
+================================================================================
+
+"Понять ассемблер — значит понять как на самом деле работает компьютер.
+ После этого любой язык высокого уровня станет понятнее."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 1: ЗАЧЕМ УЧИТЬ АССЕМБЛЕР В 2024?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  НЕ для того чтобы писать программы на ассемблере (почти никогда).
+  А для того чтобы:
+
+  1. Понять что происходит когда твой Java код выполняется
+  2. Отлаживать производительность (читать disassembly)
+  3. Понять уязвимости (Buffer Overflow, ROP chains)
+  4. Embedded системы (микроконтроллеры AVR, ARM)
+  5. Написать оптимизированные функции (SIMD инструкции)
+  6. Реверс инжиниринг (malware analysis, crack защит)
+
+  Java разработчику: понимание JVM bytecode похоже на ассемблер.
+  JIT компилятор транслирует bytecode → нативный ассемблер x86/ARM.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 2: КАК РАБОТАЕТ ПРОЦЕССОР (ФУНДАМЕНТ)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── АРХИТЕКТУРА x86-64 ──────────────────────────────────────────────────────────
+
+  РЕГИСТРЫ — сверхбыстрая память прямо в CPU (пикосекунды):
+
+  64-bit   32-bit   16-bit   8-bit   Назначение
+  RAX      EAX      AX       AL/AH   Аккумулятор (результаты, возврат функции)
+  RBX      EBX      BX       BL/BH   Базовый (сохраняется при вызовах)
+  RCX      ECX      CX       CL/CH   Счётчик (циклы, строки)
+  RDX      EDX      DX       DL/DH   Данные (умножение, деление, ввод-вывод)
+  RSI      ESI      SI       SIL     Source Index (источник в строковых операциях)
+  RDI      EDI      DI       DIL     Destination Index (приёмник)
+  RSP      ESP      SP       SPL     Stack Pointer (вершина стека)
+  RBP      EBP      BP       BPL     Base Pointer (фрейм стека)
+  R8-R15   R8D-R15D R8W-R15W R8B-R15B Дополнительные (x86-64)
+  RIP      EIP      IP       -       Instruction Pointer (текущая инструкция)
+
+  FLAGS (регистр флагов — результат операций):
+  ZF (Zero Flag)    — результат равен нулю
+  CF (Carry Flag)   — перенос из старшего бита
+  SF (Sign Flag)    — результат отрицательный
+  OF (Overflow Flag)— переполнение знакового числа
+
+─── ЦИКЛ ВЫПОЛНЕНИЯ ИНСТРУКЦИИ ──────────────────────────────────────────────────
+
+  CPU работает по циклу FETCH → DECODE → EXECUTE → WRITEBACK:
+
+  1. FETCH:    Прочитать байты инструкции из памяти по адресу RIP
+  2. DECODE:   Расшифровать: "это MOV RAX, 42" — какая операция, какие операнды
+  3. EXECUTE:  Выполнить в АЛУ (Arithmetic Logic Unit)
+  4. WRITEBACK: Записать результат в регистр или память
+  5. RIP += длина_инструкции → следующая инструкция
+
+  Современные CPU делают это для 4+ инструкций ОДНОВРЕМЕННО (суперскалярность).
+
+─── ПАМЯТЬ — ИЕРАРХИЯ ───────────────────────────────────────────────────────────
+
+  Регистры (RAX, RBX...)  ← 1 такт (0.3ns)       64 байта
+  L1 кеш                  ← 4 такта (1.2ns)       32-64 KB
+  L2 кеш                  ← 12 тактов (4ns)       256 KB - 1 MB
+  L3 кеш                  ← 40 тактов (13ns)      8-32 MB
+  RAM (DRAM)              ← 200 тактов (67ns)     8-64 GB
+  SSD (NVMe)              ← 500,000 тактов (150µs)
+  HDD                     ← 50,000,000 тактов (15ms)
+  Сеть (LAN)              ← 1,000,000,000 тактов (300µs+)
+
+  Для Java: понять почему cache miss убивает производительность.
+  ArrayList (смежная память) vs LinkedList (случайный доступ) — вот почему.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 3: СИНТАКСИС АССЕМБЛЕРА x86-64 (Intel синтаксис)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── БАЗОВЫЕ ИНСТРУКЦИИ ──────────────────────────────────────────────────────────
+
+  ФОРМАТ: MNEMONIC  DESTINATION, SOURCE   ; комментарий
+          MOV       RAX, 42               ; RAX = 42
+
+  ПЕРЕМЕЩЕНИЕ ДАННЫХ:
+    MOV dst, src     dst = src
+    MOV RAX, 42      RAX = 42  (константа)
+    MOV RAX, RBX     RAX = RBX (регистр)
+    MOV RAX, [RBX]   RAX = память[RBX]   (косвенная адресация)
+    MOV [RAX], RBX   память[RAX] = RBX
+    MOVZX EAX, AL    EAX = AL (расширение с нулями)
+    MOVSX EAX, AL    EAX = AL (расширение знаком)
+    LEA  RAX, [RBX + 8]  RAX = RBX + 8 (адрес, без обращения к памяти)
+    XCHG RAX, RBX    Swap RAX и RBX
+    PUSH RAX         [RSP-8] = RAX; RSP -= 8  (стек)
+    POP  RAX         RAX = [RSP]; RSP += 8
+
+  АРИФМЕТИКА:
+    ADD  RAX, RBX    RAX = RAX + RBX
+    SUB  RAX, RBX    RAX = RAX - RBX
+    IMUL RAX, RBX    RAX = RAX * RBX (знаковое)
+    MUL  RBX         RDX:RAX = RAX * RBX (беззнаковое, 128-bit результат)
+    IDIV RBX         RAX = RDX:RAX / RBX; RDX = остаток
+    INC  RAX         RAX++ (быстрее чем ADD RAX, 1)
+    DEC  RAX         RAX--
+    NEG  RAX         RAX = -RAX
+    NOT  RAX         RAX = ~RAX (битовое НЕ)
+
+  БИТОВЫЕ ОПЕРАЦИИ:
+    AND  RAX, RBX    RAX = RAX & RBX
+    OR   RAX, RBX    RAX = RAX | RBX
+    XOR  RAX, RBX    RAX = RAX ^ RBX
+    XOR  RAX, RAX    RAX = 0  ← БЫСТРЫЙ СПОСОБ обнулить регистр!
+    SHL  RAX, 1      RAX <<= 1  (умножение на 2)
+    SHR  RAX, 1      RAX >>= 1  (деление на 2, беззнаковое)
+    SAR  RAX, 1      RAX >>= 1  (деление на 2, знаковое)
+    ROL  RAX, 4      Циклический сдвиг влево на 4
+    ROR  RAX, 4      Циклический сдвиг вправо на 4
+
+  СРАВНЕНИЕ И ПЕРЕХОДЫ:
+    CMP  RAX, RBX    Устанавливает флаги (RAX - RBX), не сохраняет результат
+    TEST RAX, RAX    Устанавливает флаги (RAX & RAX), проверка на ноль
+    JMP  label       Безусловный переход
+    JE   label       Прыжок если равно (ZF=1)
+    JNE  label       Прыжок если не равно (ZF=0)
+    JL   label       Меньше (SF≠OF, знаковое)
+    JG   label       Больше (ZF=0 и SF=OF, знаковое)
+    JB   label       Ниже (CF=1, беззнаковое)
+    JA   label       Выше (CF=0 и ZF=0, беззнаковое)
+    LOOP label       RCX--; if RCX≠0 jump
+
+  ВЫЗОВ ФУНКЦИЙ:
+    CALL func        PUSH RIP+5; JMP func (сохранить адрес возврата)
+    RET              POP RIP (вернуться)
+    SYSCALL          Вызов системного вызова ОС
+
+─── СЕКЦИИ ПРОГРАММЫ ────────────────────────────────────────────────────────────
+
+  .text    — исполняемый код (только чтение)
+  .data    — инициализированные данные (переменные с начальными значениями)
+  .bss     — неинициализированные данные (массивы, переменные = 0)
+  .rodata  — константы только для чтения (строки)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 4: СОГЛАШЕНИЕ О ВЫЗОВАХ (CALLING CONVENTION)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  System V AMD64 ABI (Linux, macOS):
+
+  АРГУМЕНТЫ ФУНКЦИИ (в порядке):
+    1-й аргумент: RDI
+    2-й аргумент: RSI
+    3-й аргумент: RDX
+    4-й аргумент: RCX
+    5-й аргумент: R8
+    6-й аргумент: R9
+    7-й и далее: через стек
+
+  ВОЗВРАЩАЕМОЕ ЗНАЧЕНИЕ: RAX (и RDX если 128-bit)
+
+  СОХРАНЯЕМЫЕ (callee-saved): RBX, RBP, R12-R15 — функция ОБЯЗАНА сохранить
+  ВРЕМЕННЫЕ (caller-saved):   RAX, RCX, RDX, RSI, RDI, R8-R11 — могут измениться
+
+  Пример: int add(int a, int b) { return a + b; }
+    ; a в RDI, b в RSI, результат в RAX
+    add:
+        mov eax, edi    ; EAX = a
+        add eax, esi    ; EAX = a + b
+        ret             ; вернуть EAX
+
+  Windows x64 ABI:
+    1-й: RCX, 2-й: RDX, 3-й: R8, 4-й: R9, далее через стек
+    + обязательный Shadow Space (32 байта) перед вызовом!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 5: СИСТЕМНЫЕ ВЫЗОВЫ LINUX (SYSCALL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Номер syscall → RAX
+  Аргументы    → RDI, RSI, RDX, R10, R8, R9
+
+  ОСНОВНЫЕ SYSCALL (Linux x86-64):
+  Номер │ Имя      │ Описание
+  ──────┼──────────┼────────────────────────────────────────────
+  0     │ read     │ Читать из файла/stdin
+  1     │ write    │ Писать в файл/stdout
+  2     │ open     │ Открыть файл
+  3     │ close    │ Закрыть файл
+  9     │ mmap     │ Выделить память
+  11    │ munmap   │ Освободить память
+  60    │ exit     │ Завершить процесс
+  231   │ exit_group│ Завершить все потоки
+
+  ; Написать "Hello" в stdout:
+  mov rax, 1          ; syscall: write
+  mov rdi, 1          ; fd: stdout (1)
+  mov rsi, msg        ; указатель на строку
+  mov rdx, 5          ; длина строки
+  syscall
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 6: ИНСТРУМЕНТЫ И КАК НАЧАТЬ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ASSEMBLER (транслятор .asm → объектный файл):
+    NASM — Netwide Assembler (Linux, Windows, macOS). Intel синтаксис.
+    MASM — Microsoft Macro Assembler (Windows). Intel синтаксис.
+    GAS  — GNU Assembler (gcc -S). AT&T синтаксис (src и dst поменяны местами!)
+
+  УСТАНОВКА И ЗАПУСК (Linux / WSL):
+    # Установить NASM и линковщик:
+    sudo apt install nasm binutils
+
+    # Собрать и запустить:
+    nasm -f elf64 hello.asm -o hello.o    # Собрать в объектный файл
+    ld hello.o -o hello                   # Слинковать в исполняемый
+    ./hello                               # Запустить
+
+    # На Windows (NASM + GoLink):
+    nasm -f win64 hello.asm -o hello.obj
+    GoLink /console hello.obj kernel32.dll
+    hello.exe
+
+  ДИЗАССЕМБЛЕРЫ (смотреть скомпилированный код):
+    objdump -d binary        # GNU objdump
+    ndisasm binary           # NASM дизассемблер
+    gdb: disas main          # GDB отладчик
+    IDA Pro / Ghidra         # Профессиональные (Ghidra от NSA, бесплатна)
+
+  УВИДЕТЬ ASM КОД JAVA:
+    # Вывести JIT-скомпилированный asm (нужен hsdis):
+    java -XX:+PrintAssembly -XX:CompileOnly=MyClass.myMethod MyClass
+
+    # Увидеть JVM bytecode:
+    javap -c -verbose MyClass.class
+
+  ОНЛАЙН:
+    godbolt.org — Compiler Explorer: пишешь C/Java код, видишь ASM!
+    defuse.ca/online-x86-assembler.htm — онлайн ассемблер
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 7: MACRO — СОЗДАНИЕ СВОИХ "КЛЮЧЕВЫХ СЛОВ"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Macro = шаблон кода с параметрами. Как #define в C, но мощнее.
+  NASM Macro синтаксис:
+
+  ; Простой macro (без параметров):
+  %macro NEWLINE 0          ; 0 = количество параметров
+      mov rax, 1
+      mov rdi, 1
+      mov rsi, newline_char
+      mov rdx, 1
+      syscall
+  %endmacro
+
+  ; Использование:
+  NEWLINE                   ; Разворачивается в 5 инструкций выше
+
+  ; Macro с параметрами:
+  %macro PRINT 2            ; 2 параметра: строка и длина
+      mov rax, 1
+      mov rdi, 1
+      mov rsi, %1           ; %1 = первый параметр
+      mov rdx, %2           ; %2 = второй параметр
+      syscall
+  %endmacro
+
+  ; Использование:
+  PRINT hello_msg, hello_len    ; PRINT "Hello, World!", 13
+
+  ; Macro для сохранения/восстановления регистров:
+  %macro SAVE_REGS 0
+      push rbx
+      push r12
+      push r13
+  %endmacro
+
+  %macro RESTORE_REGS 0
+      pop r13
+      pop r12
+      pop rbx
+  %endmacro
+
+  ; Macro для if-else (создаём своё "ключевое слово"):
+  %macro IF_EQUAL 2         ; IF_EQUAL reg, value
+      cmp %1, %2
+      jne %%else_label      ; %% = уникальный локальный лейбл
+      ; ... тело if ...
+      jmp %%end_label
+  %%else_label:
+      ; ... тело else ...
+  %%end_label:
+  %endmacro
+
+  ; Своя "функция" через macro:
+  %macro FUNCTION 1         ; Имя функции
+  %1:
+      push rbp
+      mov rbp, rsp
+  %endmacro
+
+  %macro ENDFUNCTION 0
+      pop rbp
+      ret
+  %endmacro
+
+  ; Использование:
+  FUNCTION calculate_interest
+      ; ... код функции ...
+  ENDFUNCTION
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ЧАСТЬ 8: СВЯЗЬ С JAVA / JVM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Java код → Javac компилятор → .class (JVM bytecode) → JIT → Нативный x86
+
+  JVM BYTECODE (аналог ассемблера для JVM):
+    iload_1    ; Загрузить int из local variable 1 на стек
+    iload_2    ; Загрузить int из local variable 2 на стек
+    iadd       ; Сложить два int со стека
+    ireturn    ; Вернуть int
+
+  Для Java:
+    int add(int a, int b) { return a + b; }
+    →  JVM: iload_1; iload_2; iadd; ireturn
+    → x86: mov eax, edi; add eax, esi; ret
+
+  JNI (Java Native Interface) — вызов asm кода из Java:
+    // Java:
+    public native int nativeAdd(int a, int b);
+    static { System.loadLibrary("mylib"); }
+
+    // C код (транслируется в asm):
+    JNIEXPORT jint JNICALL Java_MyClass_nativeAdd(JNIEnv* env, jobject obj, jint a, jint b) {
+        return a + b;
+    }
+
+  JNA/Panama (Java 22) — более современный способ вызова нативного кода.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  РЕСУРСЫ ДЛЯ ИЗУЧЕНИЯ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Книги:
+    "Programming from the Ground Up" (Jonathan Bartlett) — БЕСПЛАТНО, с нуля
+    "Computer Organization and Design" (Patterson & Hennessy) — классика
+    "The Art of Assembly Language" (Randall Hyde) — NASM, подробно
+    "Reversing: Secrets of Reverse Engineering" (Eldad Eilam) — для reverse
+
+  YouTube:
+    "Intro to x86 Assembly Language" by Davy Wybiral
+    "Assembly Language" by Fireship (короткие обзоры)
+    LiveOverflow — CTF, reverse engineering, уязвимости
+
+  Онлайн:
+    cs.lmu.edu/~ray/notes/x86assembly — справочник
+    godbolt.org — посмотреть что компилятор делает из C/Java
+    shell-storm.org — онлайн ассемблер
+
+  ★ ЗАДАНИЯ (файлы в папке assembler/examples/):
+    1. Запусти hello_world.asm — выведи "Hello, World!"
+    2. Напиши программу которая считает сумму 1..100
+    3. Реализуй пузырьковую сортировку массива
+    4. Напиши macro SWAP который меняет два регистра местами без temp
+    5. Прочитай строку с stdin, выведи её длину
